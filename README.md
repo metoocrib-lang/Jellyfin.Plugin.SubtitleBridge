@@ -9,7 +9,7 @@ Plugin nativo para administrar series, idiomas y fuentes de subtítulos desde el
 https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
 ```
 
-En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versiones: 0.4.0.0 (Jellyfin 12.2, .NET 10).
+En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.4.1.0 (Jellyfin 12.2, .NET 10).
 
 ## Configurar URLs de Bazarr / Sonarr / Radarr
 
@@ -21,7 +21,7 @@ En los ajustes del plugin coloca las direcciones accesibles **desde el contenedo
 | Sonarr | `http://sonarr:8989` | Settings → General → Security |
 | Radarr | `http://radarr:7878` | Settings → General → Security |
 
-Son ejemplos: usa los nombres Docker reales, IP de LAN o URL del proxy con ruta base si corresponde. Guarda las conexiones antes de presionar **Probar**. Las claves no se muestran en la pantalla al volver a abrirla; dejar el campo vacío preserva la clave guardada.
+Son ejemplos: usa los nombres Docker reales, IP de LAN o URL del proxy con ruta base si corresponde. Pulsa **Guardar y probar** en cada servicio: primero guarda la URL y la clave introducidas y después prueba la conexión. También puedes usar **Guardar todas las conexiones**. Las claves no se muestran en la pantalla al volver a abrirla; dejar el campo vacío preserva la clave guardada.
 
 El servidor Jellyfin llama a las APIs de los servicios directamente, con `X-Api-Key` (no desde JavaScript ni el navegador). Los endpoints del plugin exigen sesión de administrador. Los servicios pueden usarse sin instalar el agente Docker.
 
