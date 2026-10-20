@@ -42,3 +42,8 @@ dotnet build Jellyfin.Plugin.SubtitleBridge/Jellyfin.Plugin.SubtitleBridge.cspro
 GitHub Actions compila, genera ZIP y ejecuta un smoke test con Jellyfin 12.2 Docker. No afirma probar tu red Docker, la página con claves reales o la extracción de Disney+.
 
 Nunca publiques API keys, contraseñas, cookies ni perfiles de navegador en GitHub. El plugin almacena las API keys en la configuración del servidor Jellyfin (protege tu directorio /config, respaldos y usuarios administradores). Proyecto independiente y no afiliado a Jellyfin ni plataformas.
+
+
+## Extractores desde plataformas de streaming (experimental)
+
+El primer prototipo para Disney+ se mantiene en [`extractor/`](extractor/README.md): navegador local con sesión iniciada por el usuario, captura HLS/WebVTT accesible, SRT e importación opcional en Bazarr. La prueba inicial requiere una URL de episodio; **no** sincroniza todavía temporadas automáticamente desde las series seguidas en Jellyfin. Netflix, Prime, Max y Apple TV+ son conectores pendientes. No se eluden DRM ni controles de acceso.
