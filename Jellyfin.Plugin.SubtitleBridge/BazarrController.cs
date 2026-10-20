@@ -206,7 +206,8 @@ public sealed class BazarrController : ControllerBase
             throw new BazarrCallException("Bazarr devolvió demasiados datos.");
 
         using var document = JsonDocument.Parse(bytes);
-        if (!document.RootElement.TryGetProperty("data", out var list)
+        if (document.RootElement.ValueKind != JsonValueKind.Object
+            || !document.RootElement.TryGetProperty("data", out var list)
             || list.ValueKind != JsonValueKind.Array)
             throw new BazarrCallException("La respuesta de Bazarr no contiene una lista de episodios.");
 
