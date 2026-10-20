@@ -56,6 +56,12 @@ public sealed class StreamingController : ControllerBase
                 data.SeriesId, data.Season, data.Episode, ct).ConfigureAwait(false));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (SingleEpisodeError error)
+        {
+            // Expose only developer-authored, categorical messages. Remote
+            // response bodies and generic exception text must stay private.
+            return StatusCode(error.HttpStatus, new { error = error.Message, code = error.Code });
+        }
         catch (ArgumentException)
         {
             return BadRequest(new { error = "Identificadores de episodio inválidos." });
