@@ -56,6 +56,14 @@ def match_episode(page, series_url: str, season: int, episode: int) -> str:
     if not allowed_disney_series_url(page.url):
         raise SubtitleError("La página se redirigió fuera de Disney+")
 
+    # Disney+ hydrates season navigation after the DOMContentLoaded event.
+    # Without this delay the selector may not exist yet and numbered episode
+    # labels are deliberately ignored. A five-second settle was verified on
+    # the user\u0027s real series page before selecting season 1.
+    page.wait_for_timeout(5_000)
+    if not allowed_disney_series_url(page.url):
+        raise SubtitleError("La página se redirigió fuera de Disney+")
+
     season_verified = _select_season(page, season)
     anchor_data = page.locator("a[href]").evaluate_all(
         """els => els.slice(0, 900).map(e => ({href:e.getAttribute('href') || '',

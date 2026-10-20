@@ -35,6 +35,7 @@ class FakePage:
     def goto(self, *args, **kwargs): pass
     def locator(self, _): return FakeLinks(self.anchors)
     def get_by_role(self, *_args, **_kwargs): return FakeMissingSeason()
+    def wait_for_timeout(self, _ms): pass
 
 
 class AgentTests(unittest.TestCase):
