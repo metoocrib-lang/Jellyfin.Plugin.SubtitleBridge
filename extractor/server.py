@@ -19,7 +19,7 @@ import time
 from .bazarr import BazarrClient
 from .disney import DisneyBrowserExtractor
 from .episode_discovery import match_episode
-from .hls import SubtitleError, allowed_disney_url
+from .hls import SubtitleError, allowed_disney_series_url
 from .providers import SUPPORTED_SITES
 
 MAX_JSON = 180_000
@@ -87,8 +87,7 @@ def valid_job(job):
         return False
     return job["provider"] != "disney" or (
         isinstance(job.get("series_url"), str)
-        and allowed_disney_url(job["series_url"], episode=True)
-        and "/series/" in job["series_url"].lower()
+        and allowed_disney_series_url(job["series_url"])
     )
 
 
