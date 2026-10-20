@@ -26,4 +26,6 @@ public sealed class TrackedMedia
     public bool Automatic { get; set; } = true;
     // URL of a streaming series page; never a password, cookie or signed CDN URL.
     public string StreamingUrl { get; set; } = string.Empty;
+    // Optional rules: 17x1-13=1x1 (one range per line). Blank means identity.
+    public string EpisodeMapping { get; set; } = string.Empty;
 }
