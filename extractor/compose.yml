@@ -1,0 +1,21 @@
+# Start from the repository root:
+# docker compose -f extractor/compose.yml up --build disney-probe
+services:
+  disney-probe:
+    build:
+      context: ..
+      dockerfile: extractor/Dockerfile
+    env_file: ../extractor/.env
+    init: true
+    shm_size: "1gb"
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:6080:6080"
+    volumes:
+      - disney_profile:/data/browser
+      - ./output:/data/output
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+volumes:
+  disney_profile:
