@@ -8,6 +8,14 @@
     "category": "Subtitles",
     "versions": [
       {
+        "version": "0.4.1.0",
+        "changelog": "Mejora del botón Guardar y probar para Bazarr, Sonarr y Radarr; guarda antes de comprobar.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/releases/download/v0.4.1.0/Moonfin.SubtitleBridge_0.4.1.0_jf12.2.zip",
+        "checksum": "8f373553fdfb34321544163fe32995eb",
+        "timestamp": "2026-10-20T19:35:04Z"
+      },
+      {
         "version": "0.4.0.0",
         "changelog": "Conexión directa a Bazarr, Sonarr y Radarr; catálogo y preferencias en Jellyfin 12.2.",
         "targetAbi": "12.2.0.0",
