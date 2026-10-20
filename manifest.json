@@ -8,6 +8,14 @@
     "category": "Subtitles",
     "versions": [
       {
+        "version": "0.4.0.0",
+        "changelog": "Conexión directa a Bazarr, Sonarr y Radarr; catálogo y preferencias en Jellyfin 12.2.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/releases/download/v0.4.0.0/Moonfin.SubtitleBridge_0.4.0.0_jf12.2.zip",
+        "checksum": "b5418d93280153aa95e7a2a2c26acedc",
+        "timestamp": "2026-10-20T19:22:15Z"
+      },
+      {
         "version": "0.3.1.0",
         "changelog": "Primer plugin nativo experimental para Jellyfin 12.2; requiere agente Docker auxiliar.",
         "targetAbi": "12.2.0.0",
