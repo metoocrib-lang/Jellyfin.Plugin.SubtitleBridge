@@ -145,69 +145,133 @@ public static class StreamingScanDispatcher
         if (seriesId < 1 || season < 0 || season > 100 || episode < 1 || episode > 999)
             throw new ArgumentOutOfRangeException(nameof(episode));
 
-        var cfg = Plugin.Instance?.Configuration ?? throw new InvalidOperationException("Plugin no inicializado");
-        var follow = (cfg.TrackedItems ?? []).SingleOrDefault(x =>
-            x.Id == seriesId && string.Equals(x.Service, "sonarr", StringComparison.OrdinalIgnoreCase));
-        if (follow is null || follow.Source != "disney" || string.IsNullOrWhiteSpace(follow.StreamingUrl))
-            throw new InvalidOperationException("Guarda primero esta serie con Disney+ y una URL válida.");
+        var cfg = Plugin.Instance?.Configuration
+            ?? throw new SingleEpisodeError("plugin_uninitialized", "Moonfin aún no está inicializado.");
+        var candidates = (cfg.TrackedItems ?? [])
+            .Where(x => x.Id == seriesId &&
+                string.Equals(x.Service, "sonarr", StringComparison.OrdinalIgnoreCase))
+            .Take(2).ToArray();
+        if (candidates.Length > 1)
+            throw new SingleEpisodeError("duplicate_tracked_series",
+                "La serie está guardada más de una vez en Moonfin. Corrige los duplicados.");
+        if (candidates.Length == 0)
+            throw new SingleEpisodeError("untracked_series",
+                "La serie no aparece entre las series de Sonarr guardadas en Moonfin.");
 
+        var follow = candidates[0];
+        if (!string.Equals(follow.Source, "disney", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(follow.StreamingUrl))
+            throw new SingleEpisodeError("series_not_disney",
+                "Guarda la serie con Disney+ y una URL de la serie antes de procesar episodios.");
+        if (string.IsNullOrWhiteSpace(follow.Language))
+            throw new SingleEpisodeError("missing_language",
+                "Selecciona un idioma para la serie y guarda sus preferencias.");
         if (string.IsNullOrWhiteSpace(cfg.BazarrApiKey) ||
-            !SafeHttpUri(cfg.BazarrUrl, out var bazarr) ||
-            string.IsNullOrWhiteSpace(cfg.BridgeToken) ||
+            !SafeHttpUri(cfg.BazarrUrl, out var bazarr))
+            throw new SingleEpisodeError("bazarr_not_configured",
+                "Configura la URL y la clave API de Bazarr en Moonfin.");
+        if (string.IsNullOrWhiteSpace(cfg.BridgeToken) ||
             !SafeHttpUri(cfg.BridgeUrl, out var agent))
-            throw new InvalidOperationException("Configura Bazarr y el agente local.");
+            throw new SingleEpisodeError("agent_not_configured",
+                "Configura la URL interna y el token del agente Docker y pulsa Probar agente.");
 
-        // The regular Bazarr /api/episodes list includes downloaded episodes,
-        // missing_subtitles and the original Sonarr IDs. No other series is read.
+        // Only consult this Sonarr series in Bazarr. Never send jobs for other
+        // episodes, even when there are many pending titles in Bazarr.
         using var query = new HttpRequestMessage(HttpMethod.Get, new Uri(
             bazarr!.AbsoluteUri.TrimEnd('/') + "/api/episodes?seriesid%5B%5D="
             + seriesId.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         query.Headers.TryAddWithoutValidation("X-API-KEY", cfg.BazarrApiKey);
-        using var response = await Http.SendAsync(query, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Bazarr respondió HTTP {(int)response.StatusCode}");
-        if (response.Content.Headers.ContentLength > 4_000_000)
-            throw new InvalidOperationException("Bazarr devolvió demasiados datos.");
-        var bytes = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
-        if (bytes.Length > 4_000_000)
-            throw new InvalidOperationException("Bazarr devolvió demasiados datos.");
-        using var data = JsonDocument.Parse(bytes);
-        var plan = SingleEpisodePlanner.Plan(data.RootElement, seriesId, season, episode,
-            follow.Language, follow.Source, follow.StreamingUrl, follow.EpisodeMapping);
-        if (plan is null)
-            return new SingleEpisodeSummary(0, 0, "El episodio no tiene archivo o ya no tiene ese subtítulo pendiente.");
-
-        // At most one job, with Sonarr IDs unchanged and only the provider
-        // season/episode translated. The agent may apply its 24h cooldown.
-        var body = JsonSerializer.Serialize(new
+        HttpResponseMessage response;
+        try
         {
-            jobs = new[] { plan.ToPayload() },
-            bazarr_url = cfg.BazarrUrl,
-            bazarr_api_key = cfg.BazarrApiKey
-        });
-        using var post = new HttpRequestMessage(HttpMethod.Post,
-            new Uri(agent!.AbsoluteUri.TrimEnd('/') + "/v1/scan"));
-        post.Headers.TryAddWithoutValidation("X-Bridge-Key", cfg.BridgeToken);
-        post.Content = new StringContent(body, Encoding.UTF8, "application/json");
-        using var result = await Http.SendAsync(post, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-        if (!result.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Agente rechazó la solicitud (HTTP {(int)result.StatusCode})");
-        if (result.Content.Headers.ContentLength > 20_000)
-            throw new InvalidOperationException("Respuesta excesiva del agente.");
-        var statusBytes = await result.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
-        if (statusBytes.Length > 20_000)
-            throw new InvalidOperationException("Respuesta excesiva del agente.");
-        using var status = JsonDocument.Parse(statusBytes);
-        var queued = ReadInt(status.RootElement, "queued", out var n) ? n : 0;
-        var cooldown = ReadInt(status.RootElement, "cooldown", out var waiting) ? waiting : 0;
-        if (queued > 1 || queued < 0 || cooldown < 0)
-            throw new InvalidOperationException("Respuesta de cola no válida.");
-        var message = queued == 1
-            ? $"Un episodio enviado: Sonarr T{season}E{episode} → Disney+ T{plan.StreamingSeason}E{plan.StreamingEpisode}. Consulta Estado y trabajos."
-            : cooldown > 0
-                ? "Este episodio está en espera por el límite de reintentos del agente (24 horas)."
-                : "El agente no aceptó el trabajo. Consulta Estado y trabajos.";
-        return new SingleEpisodeSummary(queued, cooldown, message);
+            response = await Http.SendAsync(query, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        }
+        catch (HttpRequestException)
+        {
+            throw new SingleEpisodeError("bazarr_unreachable",
+                "Jellyfin no pudo comunicarse con Bazarr desde su contenedor.", 502);
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new SingleEpisodeError("bazarr_timeout",
+                "Bazarr tardó demasiado en responder.", 504);
+        }
+        using (response)
+        {
+            if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+                throw new SingleEpisodeError("bazarr_unauthorized",
+                    "Bazarr rechazó la clave API guardada en Jellyfin. Pulsa Guardar y probar Bazarr.", 502);
+            if (!response.IsSuccessStatusCode)
+                throw new SingleEpisodeError("bazarr_http_error",
+                    $"Bazarr rechazó la consulta de episodios (HTTP {(int)response.StatusCode}).", 502);
+            if (response.Content.Headers.ContentLength > 4_000_000)
+                throw new SingleEpisodeError("bazarr_response_large",
+                    "Bazarr devolvió demasiados datos.", 502);
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+            if (bytes.Length > 4_000_000)
+                throw new SingleEpisodeError("bazarr_response_large",
+                    "Bazarr devolvió demasiados datos.", 502);
+            using var data = JsonDocument.Parse(bytes);
+            var plan = SingleEpisodePlanner.Plan(data.RootElement, seriesId, season, episode,
+                follow.Language, follow.Source, follow.StreamingUrl, follow.EpisodeMapping);
+            if (plan is null)
+                return new SingleEpisodeSummary(0, 0,
+                    "Bazarr no tiene registrado ese episodio con archivo y subtítulo pendiente en el idioma solicitado.");
+
+            var body = JsonSerializer.Serialize(new
+            {
+                jobs = new[] { plan.ToPayload() },
+                bazarr_url = cfg.BazarrUrl,
+                bazarr_api_key = cfg.BazarrApiKey
+            });
+            using var post = new HttpRequestMessage(HttpMethod.Post,
+                new Uri(agent!.AbsoluteUri.TrimEnd('/') + "/v1/scan"));
+            post.Headers.TryAddWithoutValidation("X-Bridge-Key", cfg.BridgeToken);
+            post.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            HttpResponseMessage result;
+            try
+            {
+                result = await Http.SendAsync(post, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                throw new SingleEpisodeError("agent_unreachable",
+                    "Jellyfin no puede conectarse al agente Docker. Comprueba la red y pulsa Probar agente.", 502);
+            }
+            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+            {
+                throw new SingleEpisodeError("agent_timeout",
+                    "El agente tardó demasiado en responder a la solicitud.", 504);
+            }
+            using (result)
+            {
+                if (result.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+                    throw new SingleEpisodeError("agent_unauthorized",
+                        "El agente Docker rechazó el token configurado en Moonfin. Revisa el token y pulsa Probar agente.", 502);
+                if (!result.IsSuccessStatusCode)
+                    throw new SingleEpisodeError("agent_rejected",
+                        $"El agente rechazó el trabajo (HTTP {(int)result.StatusCode}). Revisa la URL de la serie Disney+ y los ajustes del agente.", 502);
+                if (result.Content.Headers.ContentLength > 20_000)
+                    throw new SingleEpisodeError("agent_response_large",
+                        "El agente devolvió una respuesta demasiado grande.", 502);
+                var statusBytes = await result.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+                if (statusBytes.Length > 20_000)
+                    throw new SingleEpisodeError("agent_response_large",
+                        "El agente devolvió una respuesta demasiado grande.", 502);
+                using var status = JsonDocument.Parse(statusBytes);
+                var queued = ReadInt(status.RootElement, "queued", out var n) ? n : 0;
+                var cooldown = ReadInt(status.RootElement, "cooldown", out var waiting) ? waiting : 0;
+                if (queued > 1 || queued < 0 || cooldown < 0)
+                    throw new SingleEpisodeError("invalid_agent_response",
+                        "El agente devolvió contadores de cola inesperados.", 502);
+                var message = queued == 1
+                    ? $"Un episodio enviado: Sonarr T{season}E{episode} → Disney+ T{plan.StreamingSeason}E{plan.StreamingEpisode}. Consulta Estado y trabajos."
+                    : cooldown > 0
+                        ? "Este episodio está en espera por el límite de reintentos del agente (24 horas)."
+                        : "El agente no aceptó el trabajo. Consulta Estado y trabajos.";
+                return new SingleEpisodeSummary(queued, cooldown, message);
+            }
+        }
     }
 
     public static bool SafeHttpUri(string? value, out Uri? uri)

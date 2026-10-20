@@ -106,3 +106,28 @@ try {
     throw new Exception("Unmapped season was accepted");
 } catch (InvalidOperationException) { }
 Console.WriteLine("SingleEpisodePlanner: all checks passed.");
+
+
+// Typed diagnostic errors must be predictable and must not contain URLs or secrets.
+try
+{
+    SingleEpisodePlanner.Plan(bazarr.RootElement, 42, 16, 1, "es", "disney",
+        "https://www.disneyplus.com/es-419/browse/entity-571475d5-8b1a-453f-a57f-26bb4dd13304", bleach);
+    throw new Exception("Unmapped episode should raise a typed diagnostic.");
+}
+catch (SingleEpisodeError error)
+{
+    Expect(error.Code == "unmapped_episode" && error.HttpStatus == 409, "Safe mapping diagnostic");
+    Expect(!error.Message.Contains("https://", StringComparison.Ordinal), "No URL in diagnostic");
+}
+try
+{
+    SingleEpisodePlanner.Plan(duplicate.RootElement, 42, 17, 2, "es", "disney",
+        "https://www.disneyplus.com/es-419/browse/entity-571475d5-8b1a-453f-a57f-26bb4dd13304", bleach);
+    throw new Exception("Ambiguous episode should raise a typed diagnostic.");
+}
+catch (SingleEpisodeError error)
+{
+    Expect(error.Code == "ambiguous_episode", "Ambiguous Bazarr diagnostic");
+}
+Console.WriteLine("Single episode diagnostics: all checks passed.");

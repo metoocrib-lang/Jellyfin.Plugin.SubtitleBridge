@@ -133,7 +133,23 @@
       });
     }
     function errorText(e, defaultMessage) {
-      return (e && e.responseJSON && e.responseJSON.error) || defaultMessage;
+      // ApiClient.ajax does not always supply responseJSON on a failed POST.
+      // Show only a bounded, structured JSON error from Moonfin, never a
+      // raw response, arbitrary exception or request headers/tokens.
+      let data = e && e.responseJSON;
+      if (!data && e && typeof e.responseText === 'string' && e.responseText.length < 4096) {
+        try { data = JSON.parse(e.responseText); } catch (_) { /* ignore HTML or text */ }
+      }
+      if (!data && e && e.response && typeof e.response === 'object')
+        data = e.response.data;
+      if (data && typeof data.error === 'string' && data.error.length > 0 && data.error.length <= 300) {
+        const code = typeof data.code === 'string' && /^[a-z_]{3,40}$/.test(data.code)
+          ? ' (' + data.code + ')' : '';
+        return data.error + code;
+      }
+      const status = Number(e && (e.status || (e.response && e.response.status)));
+      return Number.isInteger(status) && status >= 400 && status <= 599
+        ? defaultMessage + ' (HTTP ' + status + ').' : defaultMessage;
     }
     async function saveConfig(mutator) {
       const config = await ApiClient.getPluginConfiguration(guid);
