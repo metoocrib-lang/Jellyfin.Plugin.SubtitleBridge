@@ -19,11 +19,22 @@ class FakeLinks:
     def evaluate_all(self, _): return self.anchors
 
 
+class FakeMissingSeason:
+    first = None
+
+    def __init__(self):
+        self.first = self
+
+    def count(self):
+        return 0
+
+
 class FakePage:
     url = "https://www.disneyplus.com/series/demo"
     def __init__(self, anchors): self.anchors = anchors
     def goto(self, *args, **kwargs): pass
     def locator(self, _): return FakeLinks(self.anchors)
+    def get_by_role(self, *_args, **_kwargs): return FakeMissingSeason()
 
 
 class AgentTests(unittest.TestCase):
