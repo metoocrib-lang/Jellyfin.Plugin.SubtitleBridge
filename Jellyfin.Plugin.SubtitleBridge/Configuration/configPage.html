@@ -77,6 +77,22 @@
       <p>La búsqueda se inicia cuando Jellyfin agrega un episodio físico nuevo a su biblioteca. El plugin espera unos segundos para completar metadatos, comprueba la coincidencia TVDB entre Jellyfin y Sonarr y verifica el idioma pendiente en Bazarr. No hace revisiones diarias. Si Jellyfin no dispone del identificador TVDB, no intentará asociar el episodio.</p>
       <p>También puedes revisar manualmente las series seleccionadas para recuperar episodios agregados mientras Jellyfin estuvo apagado.</p>
       <button type="button" is="emby-button" class="raised" id="msbStreamingScan">Revisar ahora (manual)</button>
+      <h3>Procesar un episodio (manual)</h3>
+      <p>Selecciona una serie seguida de Sonarr, su temporada y episodio <strong>según Sonarr</strong>. Solo se enviará ese capítulo a Disney+ si Bazarr confirma que tiene archivo y le falta el idioma seleccionado. No es necesario activar Automático. El agente limita los reintentos a uno cada 24 horas.</p>
+      <div class="inputContainer">
+        <label class="inputLabel" for="msbSingleSeries">Serie de Sonarr guardada con Disney+</label>
+        <select id="msbSingleSeries" is="emby-select"></select>
+      </div>
+      <div class="inputContainer">
+        <label class="inputLabel" for="msbSingleSeason">Temporada en Sonarr</label>
+        <input id="msbSingleSeason" is="emby-input" type="number" min="0" max="100" step="1" placeholder="Ej.: 17"/>
+      </div>
+      <div class="inputContainer">
+        <label class="inputLabel" for="msbSingleEpisode">Episodio en Sonarr</label>
+        <input id="msbSingleEpisode" is="emby-input" type="number" min="1" max="999" step="1" placeholder="Ej.: 2"/>
+      </div>
+      <button type="button" is="emby-button" class="raised" id="msbSingleSubmit">Procesar un episodio</button>
+      <div id="msbSingleResult" role="status" aria-live="polite"></div>
       <p><strong>Experimental:</strong> Disney+ intentará identificar episodios por enlaces etiquetados inequívocamente; si el catálogo no expone esos datos, aparecerá “episodio_no_identificado” y no se descargará nada. Netflix, Prime, Max y Apple TV+ aún no tienen extractores operativos.</p>
     </details>
   </div></div>
@@ -115,8 +131,28 @@
       mutator(config);
       await ApiClient.updatePluginConfiguration(guid, config);
     }
+    function refreshSingleSeries(cfg) {
+      const select = q('#msbSingleSeries');
+      const previous = select.value;
+      select.replaceChildren();
+      const items = (Array.isArray(cfg.TrackedItems) ? cfg.TrackedItems : [])
+        .filter(x => x.Service === 'sonarr' && x.Source === 'disney' && Number(x.Id) > 0 && x.StreamingUrl);
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = items.length ? 'Selecciona una serie…' : 'No hay series Disney+ guardadas';
+      select.append(placeholder);
+      for (const item of items) {
+        const opt = document.createElement('option');
+        opt.value = String(item.Id);
+        opt.textContent = 'Sonarr ID ' + item.Id + ' · ' + item.StreamingUrl.replace(/^https:\/\/(?:www\.)?disneyplus\.com\//i, '');
+        // Use an ID-based label: this panel never guesses a Sonarr title.
+        select.append(opt);
+      }
+      select.value = items.some(x => String(x.Id) === previous) ? previous : '';
+    }
     async function loadConfig() {
       const cfg = await ApiClient.getPluginConfiguration(guid);
+      refreshSingleSeries(cfg);
       for (const service of fields) {
         q('#msb' + service.name + 'Url').value = cfg[service.name + 'Url'] || '';
         q('#msb' + service.name + 'Key').value = '';
@@ -279,6 +315,7 @@
                 config.TrackedItems.push({Service:service,Id:id,Language:language.value,Source:source.value,Automatic:automatic.checked,StreamingUrl:streamingUrl.value.trim(),EpisodeMapping:service === 'sonarr' ? mapping.value.trim() : ''});
               });
               button.textContent = 'Actualizar preferencias';
+              refreshSingleSeries(await ApiClient.getPluginConfiguration(guid));
               message('Preferencias guardadas: ' + item.title + '. El agente usará estas reglas en nuevos episodios y revisiones manuales.');
             } catch (e) { message(e && e.message ? e.message : 'Error al guardar el título.'); }
           });
@@ -291,6 +328,7 @@
                 config.TrackedItems = (config.TrackedItems || []).filter(x => !(x.Service === service && Number(x.Id) === id));
               });
               button.textContent = 'Seguir título';
+              refreshSingleSeries(await ApiClient.getPluginConfiguration(guid));
               message('Título eliminado del seguimiento.');
             } catch (_) { message('Error al eliminar el título.'); }
           });
@@ -368,6 +406,34 @@
         q('#msbStreamingOutput').textContent = JSON.stringify(result, null, 2);
         message('Estado actualizado.');
       } catch (err) { message(errorText(err, 'Agente de streaming no disponible.')); }
+    });
+    q('#msbSingleSubmit').addEventListener('click', async () => {
+      const btn = q('#msbSingleSubmit');
+      const output = q('#msbSingleResult');
+      const id = Number(q('#msbSingleSeries').value);
+      const season = Number(q('#msbSingleSeason').value);
+      const episode = Number(q('#msbSingleEpisode').value);
+      if (!Number.isSafeInteger(id) || id < 1
+          || q('#msbSingleSeason').value.trim() === ''
+          || q('#msbSingleEpisode').value.trim() === ''
+          || !Number.isInteger(season) || season < 0 || season > 100
+          || !Number.isInteger(episode) || episode < 1 || episode > 999) {
+        output.textContent = 'Selecciona una serie Disney+ guardada y números válidos de Sonarr.';
+        return;
+      }
+      if (!window.confirm('Procesar solamente Sonarr T' + season + 'E' + episode +
+          ' de la serie ' + id + '? Se intentará extraer e importar un SRT en Bazarr si falta.')) return;
+      btn.disabled = true;
+      output.textContent = 'Comprobando en Bazarr y solicitando un único episodio…';
+      try {
+        const result = await apiPost('streaming/episode', {seriesId:id,season,episode});
+        output.textContent = result.Message || result.message ||
+          'Consulta el estado del agente para comprobar el trabajo.';
+      } catch (e) {
+        output.textContent = errorText(e, 'No se pudo procesar el episodio. Revisa los ajustes.');
+      } finally {
+        btn.disabled = false;
+      }
     });
     q('#msbStreamingScan').addEventListener('click', async () => {
       try {
