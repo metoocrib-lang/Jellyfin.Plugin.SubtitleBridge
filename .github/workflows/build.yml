@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      archive: Moonfin.SubtitleBridge_0.8.0.0_jf12.2.zip
+      archive: Moonfin.SubtitleBridge_0.8.1.0_jf12.2.zip
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -42,13 +42,13 @@ jobs:
           mkdir -p dist/package
           test -s Jellyfin.Plugin.SubtitleBridge/bin/Release/net10.0/Jellyfin.Plugin.SubtitleBridge.dll
           cp Jellyfin.Plugin.SubtitleBridge/bin/Release/net10.0/Jellyfin.Plugin.SubtitleBridge.dll dist/package/
-          (cd dist/package && zip -9 -j ../Moonfin.SubtitleBridge_0.8.0.0_jf12.2.zip Jellyfin.Plugin.SubtitleBridge.dll)
-          unzip -t dist/Moonfin.SubtitleBridge_0.8.0.0_jf12.2.zip
-          md5sum dist/Moonfin.SubtitleBridge_0.8.0.0_jf12.2.zip
+          (cd dist/package && zip -9 -j ../Moonfin.SubtitleBridge_0.8.1.0_jf12.2.zip Jellyfin.Plugin.SubtitleBridge.dll)
+          unzip -t dist/Moonfin.SubtitleBridge_0.8.1.0_jf12.2.zip
+          md5sum dist/Moonfin.SubtitleBridge_0.8.1.0_jf12.2.zip
       - uses: actions/upload-artifact@v4
         with:
           name: moonfin-jellyfin-12.2-test
-          path: dist/Moonfin.SubtitleBridge_0.8.0.0_jf12.2.zip
+          path: dist/Moonfin.SubtitleBridge_0.8.1.0_jf12.2.zip
           if-no-files-found: error
 
   publish:
@@ -68,14 +68,14 @@ jobs:
       - name: Publish test pre-release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.8.0.0
+          TAG: v0.8.1.0
         shell: bash
         run: |
           set -euo pipefail
-          ZIP=dist/Moonfin.SubtitleBridge_0.8.0.0_jf12.2.zip
+          ZIP=dist/Moonfin.SubtitleBridge_0.8.1.0_jf12.2.zip
           test -s "$ZIP"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" "$ZIP" --target "$GITHUB_SHA" --title "$TAG - Jellyfin 12.2 experimental" --prerelease --notes "Nueva función Procesar un episodio desde Jellyfin y filtro instantáneo de series de Sonarr y películas de Radarr."
+            gh release create "$TAG" "$ZIP" --target "$GITHUB_SHA" --title "$TAG - Jellyfin 12.2 experimental" --prerelease --notes "Diagnósticos precisos y seguros de Bazarr, agente, configuración y equivalencias en el procesamiento individual desde Jellyfin."
           else
             gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$(basename "$ZIP")"
             mkdir -p dist/released
@@ -85,8 +85,8 @@ jobs:
           fi
       - name: Write plugin repository catalog
         env:
-          ARCHIVE: dist/Moonfin.SubtitleBridge_0.8.0.0_jf12.2.zip
-          TAG: v0.8.0.0
+          ARCHIVE: dist/Moonfin.SubtitleBridge_0.8.1.0_jf12.2.zip
+          TAG: v0.8.1.0
         run: python scripts/publish_manifest.py
       - name: Commit catalog
         shell: bash
