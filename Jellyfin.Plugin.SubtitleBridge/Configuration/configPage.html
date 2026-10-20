@@ -56,6 +56,12 @@
     <p>Selecciona la plataforma, el idioma, la URL pública y Automático por serie. Jellyfin revisa los episodios nuevos, sin tarea diaria. Si los catálogos usan distinta numeración, configura reglas de equivalencia.</p>
     <button is="emby-button" class="raised" type="button" id="msbLoadShows">Cargar series de Sonarr</button>
     <button is="emby-button" class="raised" type="button" id="msbLoadMovies">Cargar películas de Radarr</button>
+    <div class="inputContainer">
+      <label class="inputLabel" for="msbLibrarySearch">Buscar en series o películas cargadas</label>
+      <input id="msbLibrarySearch" is="emby-input" type="search" autocomplete="off" placeholder="Escribe un título, por ejemplo Bleach"/>
+      <small>Filtra inmediatamente los resultados de la lista seleccionada, sin consultar nuevamente Sonarr ni Radarr.</small>
+    </div>
+    <p id="msbLibraryCount" role="status" aria-live="polite"></p>
     <div id="msbLibrary"></div>
     <hr>
     <details>
@@ -103,6 +109,8 @@
     const q = s => root.querySelector(s);
     const message = text => { q('#msbMessage').textContent = text; };
     const sonarrTitles = new Map();
+    let libraryItems = [];
+    let libraryService = '';
     const fields = [
       {name:'Bazarr', lower:'bazarr'},
       {name:'Sonarr', lower:'sonarr'},
@@ -248,9 +256,33 @@
         rules.push({ss,start,end,ps,first,last});
       }
     }
+    function normalizeLibraryText(value) {
+      return String(value || '').normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+    function updateLibraryFilter() {
+      const words = normalizeLibraryText(q('#msbLibrarySearch').value).trim()
+        .split(/\s+/).filter(Boolean);
+      let shown = 0;
+      for (const entry of libraryItems) {
+        const visible = words.every(word => entry.searchable.includes(word));
+        entry.element.style.display = visible ? '' : 'none';
+        if (visible) shown++;
+      }
+      const kind = libraryService === 'sonarr' ? 'series' : 'películas';
+      q('#msbLibraryCount').textContent = libraryService
+        ? 'Mostrando ' + shown + ' de ' + libraryItems.length + ' ' + kind +
+          (words.length && !shown ? '. Ninguna coincide con la búsqueda.' : '')
+        : 'Carga las series de Sonarr o las películas de Radarr para comenzar.';
+    }
+    q('#msbLibrarySearch').addEventListener('input', updateLibraryFilter);
     async function loadLibrary(service) {
       const area = q('#msbLibrary');
       area.replaceChildren();
+      libraryItems = [];
+      if (libraryService !== service) q('#msbLibrarySearch').value = '';
+      libraryService = service;
+      q('#msbLibraryCount').textContent = 'Cargando títulos…';
       message('Consultando ' + (service === 'sonarr' ? 'Sonarr' : 'Radarr') + '…');
       try {
         const result = await api('connections/library?service=' + service);
@@ -265,9 +297,6 @@
           }
           refreshSingleSeries(cfg);
         }
-        const count = document.createElement('p');
-        count.textContent = result.length + ' títulos encontrados';
-        area.append(count);
         for (const item of result) {
           const id = Number(item.id);
           if (!Number.isSafeInteger(id) || id < 1) continue;
@@ -396,9 +425,15 @@
             row.append(pendingButton, pendingArea);
           }
           area.append(row);
+          libraryItems.push({
+            element: row,
+            searchable: normalizeLibraryText((item.title || '') + ' ' + id)
+          });
         }
+        updateLibraryFilter();
         message('Catálogo cargado desde ' + service + '.');
       } catch (e) {
+        q('#msbLibraryCount').textContent = 'No fue posible cargar los títulos.';
         message(errorText(e, 'No se pudo consultar el catálogo. Guarda y prueba primero su conexión.'));
       }
     }
