@@ -108,7 +108,7 @@ public static class SingleEpisodePlanner
 }
 
 
-public sealed class SingleEpisodeError : Exception
+public sealed class SingleEpisodeError : InvalidOperationException
 {
     public string Code { get; }
     public int HttpStatus { get; }
