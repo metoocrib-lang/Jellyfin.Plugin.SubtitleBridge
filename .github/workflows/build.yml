@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Validate Jellyfin admin UI JavaScript
+        run: python scripts/check_config_js.py
       - name: Check episode mapping rules
         run: dotnet run --project tests/EpisodeMapping.Tests/EpisodeMapping.Tests.csproj
       - name: Restore
