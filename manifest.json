@@ -8,6 +8,14 @@
     "category": "Subtitles",
     "versions": [
       {
+        "version": "0.8.0.0",
+        "changelog": "Procesamiento manual de un episodio desde Jellyfin y buscador instantáneo de series Sonarr y películas Radarr; selección exclusiva y segura de Bazarr.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/releases/download/v0.8.0.0/Moonfin.SubtitleBridge_0.8.0.0_jf12.2.zip",
+        "checksum": "1115870b6a5ba6957b8928afe51a1b2a",
+        "timestamp": "2026-10-20T23:25:05Z"
+      },
+      {
         "version": "0.7.0.0",
         "changelog": "Equivalencias configurables por serie entre temporadas de Sonarr y streaming; conserva IDs para Bazarr y rechaza mapeos ambiguos.",
         "targetAbi": "12.2.0.0",
