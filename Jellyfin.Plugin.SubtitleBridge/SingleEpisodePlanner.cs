@@ -32,11 +32,11 @@ public static class SingleEpisodePlanner
             throw new ArgumentOutOfRangeException(nameof(episode));
         // Deliberately support only the currently implemented streaming adapter.
         if (provider != "disney" || string.IsNullOrWhiteSpace(streamingUrl))
-            throw new InvalidOperationException("Esta fuente de streaming aún no se puede procesar.");
+            throw new SingleEpisodeError("unsupported_source", "La serie no está configurada con una fuente Disney+ válida.");
 
         var rules = EpisodeMapper.Parse(mapping);
         if (!EpisodeMapper.TryMap(rules, season, episode, out var streamingSeason, out var streamingEpisode))
-            throw new InvalidOperationException("El episodio no tiene una equivalencia configurada.");
+            throw new SingleEpisodeError("unmapped_episode", "No existe una regla de equivalencia para la temporada y episodio solicitados. Revisa las reglas guardadas en Bleach.");
 
         if (root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty("data", out var data)
@@ -58,7 +58,7 @@ public static class SingleEpisodePlanner
             // Two entries for the same coordinates are ambiguous, even if only
             // one has an available subtitle or media file.
             if (found is not null || HasDuplicateCoordinate(data, seriesId, season, episode))
-                throw new InvalidOperationException("Bazarr devolvió más de un episodio con esa numeración.");
+                throw new SingleEpisodeError("ambiguous_episode", "Bazarr contiene varios episodios con la misma temporada y número. No se enviará ninguno.");
 
             if (!item.TryGetProperty("path", out var path)
                 || path.ValueKind != JsonValueKind.String
@@ -104,5 +104,21 @@ public static class SingleEpisodePlanner
         return item.TryGetProperty(name, out var property)
             && property.ValueKind == JsonValueKind.Number
             && property.TryGetInt32(out value);
+    }
+}
+
+
+public sealed class SingleEpisodeError : Exception
+{
+    public string Code { get; }
+    public int HttpStatus { get; }
+
+    // Only pass predefined, non-sensitive messages. Never forward remote
+    // response bodies, token values, URLs or arbitrary exception text.
+    public SingleEpisodeError(string code, string safeMessage, int httpStatus = 409)
+        : base(safeMessage)
+    {
+        Code = code;
+        HttpStatus = httpStatus;
     }
 }
