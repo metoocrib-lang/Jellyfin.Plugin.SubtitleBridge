@@ -1,0 +1,30 @@
+name: Streaming subtitle extractor unit tests
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'extractor/**'
+      - '.github/workflows/extractor-tests.yml'
+  pull_request:
+    paths:
+      - 'extractor/**'
+      - '.github/workflows/extractor-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run pure Python extractor tests (no platform credentials)
+        run: python -m unittest discover -s extractor/tests -v
+      - name: Syntax check
+        run: python -m compileall -q extractor
+      - name: Build Docker browser agent image (no credentials)
+        run: docker build --file extractor/Dockerfile --tag moonfin-disney-probe:ci .

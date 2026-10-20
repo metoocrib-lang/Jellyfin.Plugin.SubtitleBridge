@@ -1,0 +1,14 @@
+.git
+**/.env
+**/.env.*
+!**/.env.example
+**/output/**
+**/browser/**
+**/.browser-profile/**
+**/__pycache__/**
+**/.pytest_cache/**
+**/bin/**
+**/obj/**
+*.zip
+*.srt
+*.vtt

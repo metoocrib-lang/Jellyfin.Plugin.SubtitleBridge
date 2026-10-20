@@ -14,3 +14,9 @@ browser-profile/
 playwright-profile/
 __pycache__/
 .pytest_cache/
+
+# Browser sessions, local credentials and extracted subtitle artifacts
+extractor/.env
+extractor/output/
+extractor/browser/
+extractor/.browser-profile/
