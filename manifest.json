@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "guid": "b8e43169-c5f4-41d3-a9a0-8f4b9f85d792",
+    "name": "Moonfin Subtitle Bridge",
+    "description": "Selecciona series e idiomas y coordina subtítulos con Bazarr desde Jellyfin.",
+    "overview": "Jellyfin + Bazarr + agente Disney+ experimental (servicio Docker separado).",
+    "owner": "metoocrib-lang",
+    "category": "Subtitles",
+    "versions": [
+      {
+        "version": "0.3.1.0",
+        "changelog": "Primer plugin nativo experimental para Jellyfin 12.2; requiere agente Docker auxiliar.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/releases/download/v0.3.1.0/Moonfin.SubtitleBridge_0.3.1.0_jf12.2.zip",
+        "checksum": "da2eba9d63461d90525d1661f5389417",
+        "timestamp": "2026-10-20T18:59:34Z"
+      }
+    ]
+  }
+]
