@@ -9,7 +9,7 @@ Plugin nativo para administrar series, idiomas y fuentes de subtítulos desde el
 https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
 ```
 
-En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.4.1.0 (Jellyfin 12.2, .NET 10).
+En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.5.0.0 (Jellyfin 12.2, .NET 10).
 
 ## Configurar URLs de Bazarr / Sonarr / Radarr
 
@@ -27,9 +27,9 @@ El servidor Jellyfin llama a las APIs de los servicios directamente, con `X-Api-
 
 - **Probar Bazarr/Sonarr/Radarr**: conexión autenticada y versión de servicio (si la API la devuelve).
 - **Cargar series/películas**: obtiene listas de Sonarr y Radarr sin agente.
-- **Seguir título**: guarda en la configuración del plugin Jellyfin el idioma, fuente y opción de seguimiento automático.
+- **Seguir título**: guarda en la configuración del plugin Jellyfin el idioma, fuente y opción de seguimiento automático.\n- **Ver episodios pendientes en Bazarr**: para una serie seguida con fuente Proveedores Bazarr, consulta los capítulos que Bazarr marca como faltantes en el idioma guardado, sin descargarlos.\n- **Buscar subtítulo en Bazarr**: solicita manualmente la búsqueda para **un episodio** mediante PATCH /api/episodes/subtitles. No garantiza resultados ni finalización inmediata.
 
-**Limitación importante:** guardar el seguimiento todavía NO inicia descargas ni envía peticiones a Bazarr: falta implementar el planificador y la vinculación de episodios de Disney+. El agente de navegador es opcional y experimental, y sigue siendo necesario para intentar extraer subtítulos de Disney+ en una sesión autorizada. Ni el plugin ni la configuración directa evaden DRM.
+**Limitación importante:** la búsqueda en Bazarr es por episodio y requiere pulsar Buscar. El seguimiento automático se guarda, pero todavía no existe un planificador. El listado depende de los idiomas faltantes según los perfiles de Bazarr (un episodio sin perfil deseado no aparecerá). Falta implementar el planificador y la vinculación de episodios de Disney+. El agente de navegador es opcional y experimental, y sigue siendo necesario para intentar extraer subtítulos de Disney+ en una sesión autorizada. Ni el plugin ni la configuración directa evaden DRM.
 
 ## Desarrollo y pruebas
 
