@@ -135,6 +135,81 @@ public static class StreamingScanDispatcher
             "Solicitudes enviadas al agente. Consulta su estado para confirmar la extracción.");
     }
 
+    /// <summary>
+    /// Admin-triggered single-episode request. Does not depend on Automatic and
+    /// does not use the bulk wanted list; Bazarr is queried for only this series.
+    /// </summary>
+    public static async Task<SingleEpisodeSummary> ScanSingleAsync(
+        int seriesId, int season, int episode, CancellationToken ct)
+    {
+        if (seriesId < 1 || season < 0 || season > 100 || episode < 1 || episode > 999)
+            throw new ArgumentOutOfRangeException(nameof(episode));
+
+        var cfg = Plugin.Instance?.Configuration ?? throw new InvalidOperationException("Plugin no inicializado");
+        var follow = (cfg.TrackedItems ?? []).SingleOrDefault(x =>
+            x.Id == seriesId && string.Equals(x.Service, "sonarr", StringComparison.OrdinalIgnoreCase));
+        if (follow is null || follow.Source != "disney" || string.IsNullOrWhiteSpace(follow.StreamingUrl))
+            throw new InvalidOperationException("Guarda primero esta serie con Disney+ y una URL válida.");
+
+        if (string.IsNullOrWhiteSpace(cfg.BazarrApiKey) ||
+            !SafeHttpUri(cfg.BazarrUrl, out var bazarr) ||
+            string.IsNullOrWhiteSpace(cfg.BridgeToken) ||
+            !SafeHttpUri(cfg.BridgeUrl, out var agent))
+            throw new InvalidOperationException("Configura Bazarr y el agente local.");
+
+        // The regular Bazarr /api/episodes list includes downloaded episodes,
+        // missing_subtitles and the original Sonarr IDs. No other series is read.
+        using var query = new HttpRequestMessage(HttpMethod.Get, new Uri(
+            bazarr!.AbsoluteUri.TrimEnd('/') + "/api/episodes?seriesid%5B%5D="
+            + seriesId.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        query.Headers.TryAddWithoutValidation("X-API-KEY", cfg.BazarrApiKey);
+        using var response = await Http.SendAsync(query, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Bazarr respondió HTTP {(int)response.StatusCode}");
+        if (response.Content.Headers.ContentLength > 4_000_000)
+            throw new InvalidOperationException("Bazarr devolvió demasiados datos.");
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+        if (bytes.Length > 4_000_000)
+            throw new InvalidOperationException("Bazarr devolvió demasiados datos.");
+        using var data = JsonDocument.Parse(bytes);
+        var plan = SingleEpisodePlanner.Plan(data.RootElement, seriesId, season, episode,
+            follow.Language, follow.Source, follow.StreamingUrl, follow.EpisodeMapping);
+        if (plan is null)
+            return new SingleEpisodeSummary(0, 0, "El episodio no tiene archivo o ya no tiene ese subtítulo pendiente.");
+
+        // At most one job, with Sonarr IDs unchanged and only the provider
+        // season/episode translated. The agent may apply its 24h cooldown.
+        var body = JsonSerializer.Serialize(new
+        {
+            jobs = new[] { plan.ToPayload() },
+            bazarr_url = cfg.BazarrUrl,
+            bazarr_api_key = cfg.BazarrApiKey
+        });
+        using var post = new HttpRequestMessage(HttpMethod.Post,
+            new Uri(agent!.AbsoluteUri.TrimEnd('/') + "/v1/scan"));
+        post.Headers.TryAddWithoutValidation("X-Bridge-Key", cfg.BridgeToken);
+        post.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        using var result = await Http.SendAsync(post, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        if (!result.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Agente rechazó la solicitud (HTTP {(int)result.StatusCode})");
+        if (result.Content.Headers.ContentLength > 20_000)
+            throw new InvalidOperationException("Respuesta excesiva del agente.");
+        var statusBytes = await result.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+        if (statusBytes.Length > 20_000)
+            throw new InvalidOperationException("Respuesta excesiva del agente.");
+        using var status = JsonDocument.Parse(statusBytes);
+        var queued = ReadInt(status.RootElement, "queued", out var n) ? n : 0;
+        var cooldown = ReadInt(status.RootElement, "cooldown", out var waiting) ? waiting : 0;
+        if (queued > 1 || queued < 0 || cooldown < 0)
+            throw new InvalidOperationException("Respuesta de cola no válida.");
+        var message = queued == 1
+            ? $"Un episodio enviado: Sonarr T{season}E{episode} → Disney+ T{plan.StreamingSeason}E{plan.StreamingEpisode}. Consulta Estado y trabajos."
+            : cooldown > 0
+                ? "Este episodio está en espera por el límite de reintentos del agente (24 horas)."
+                : "El agente no aceptó el trabajo. Consulta Estado y trabajos.";
+        return new SingleEpisodeSummary(queued, cooldown, message);
+    }
+
     public static bool SafeHttpUri(string? value, out Uri? uri)
     {
         uri = null;
@@ -154,3 +229,4 @@ public static class StreamingScanDispatcher
     }
 }
 public sealed record ScanSummary(int CheckedEpisodes, int Submitted, string Message);
+public sealed record SingleEpisodeSummary(int Queued, int Cooldown, string Message);
