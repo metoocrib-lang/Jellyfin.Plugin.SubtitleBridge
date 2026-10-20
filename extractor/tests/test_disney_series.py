@@ -130,6 +130,29 @@ class DisneySeriesUrlTests(unittest.TestCase):
                          "https://www.disneyplus.com/es-419/play/bleach-01")
         self.assertEqual(page.selected_season, 1)
 
+    def test_waits_for_disney_season_ui_to_hydrate(self):
+        class DelayedSeasonPage(FakePage):
+            def __init__(self):
+                super().__init__([], seasons={
+                    4: [{"href": "/play/season4-1", "label": "1. OTRO EPISODIO"}],
+                    1: [
+                        {"href": "/es-419/play/bleach-01", "label": "1. LA GUERRA DE SANGRE"},
+                        {"href": "/es-419/play/bleach-02", "label": "2. LAS PIEDRAS ANGULARES"},
+                    ],
+                })
+                self.waited_for_hydration = False
+
+            def wait_for_timeout(self, ms):
+                if ms >= 5000 and self.selected_season is None:
+                    self.waited_for_hydration = True
+                    self.selected_season = 4
+
+        page = DelayedSeasonPage()
+        self.assertEqual(match_episode(page, BLEACH, 1, 1),
+                         "https://www.disneyplus.com/es-419/play/bleach-01")
+        self.assertTrue(page.waited_for_hydration)
+        self.assertEqual(page.selected_season, 1)
+
     def test_rejects_number_without_verified_season(self):
         page = FakePage([
             {"href": "/play/e1", "label": "1. LA GUERRA DE SANGRE"},
