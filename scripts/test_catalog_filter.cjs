@@ -30,7 +30,11 @@ const context = {
     throw new Error('Unexpected DOM selector ' + selector);
   },
 };
-vm.runInNewContext(html.slice(start,end),context);
+vm.runInNewContext(html.slice(start,end) + '\nthis.catalogNormalize = normalizeLibraryText;', context);
+const names = ['Bleach', 'Película Árbol', 'One Piece'];
+entries.forEach((entry, i) => {
+  entry.searchable = context.catalogNormalize(names[i] + ' ' + (i + 1));
+});
 assert.equal(typeof onInput,'function');
 function expect(query, visible, n) {
   search.value=query;
