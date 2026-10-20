@@ -26,7 +26,7 @@ jobs:
           mkdir -p smoke/config/plugins/MoonfinSubtitleBridge_0.3.1.0
           cp Jellyfin.Plugin.SubtitleBridge/bin/Release/net10.0/Jellyfin.Plugin.SubtitleBridge.dll smoke/config/plugins/MoonfinSubtitleBridge_0.3.1.0/
           chmod -R a+rwX smoke
-          docker run -d --name smoke-jellyfin -p 127.0.0.1:18096:8096 -v "$PWD/smoke/config:/config" jellyfin/jellyfin:12.2.0
+          docker run -d --name smoke-jellyfin -p 127.0.0.1:18096:8096 -v "$PWD/smoke/config:/config" jellyfin/jellyfin:12.2
           ok=0
           for i in $(seq 1 60); do
             if curl --max-time 3 -fsS http://127.0.0.1:18096/health; then ok=1; break; fi
