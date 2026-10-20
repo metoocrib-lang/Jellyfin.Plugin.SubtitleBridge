@@ -8,6 +8,14 @@
     "category": "Subtitles",
     "versions": [
       {
+        "version": "0.7.0.0",
+        "changelog": "Equivalencias configurables por serie entre temporadas de Sonarr y streaming; conserva IDs para Bazarr y rechaza mapeos ambiguos.",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/releases/download/v0.7.0.0/Moonfin.SubtitleBridge_0.7.0.0_jf12.2.zip",
+        "checksum": "b5ee63eaa9027c08ea15b3cba4251d5b",
+        "timestamp": "2026-10-20T22:38:11Z"
+      },
+      {
         "version": "0.6.0.0",
         "changelog": "Panel de cuentas y URLs de streaming; activación por episodio nuevo en Jellyfin y cola experimental Disney+ en contenedor privado.",
         "targetAbi": "12.2.0.0",
