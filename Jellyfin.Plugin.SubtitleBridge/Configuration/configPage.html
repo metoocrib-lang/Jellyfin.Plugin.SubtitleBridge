@@ -102,6 +102,7 @@
     const guid = 'b8e43169-c5f4-41d3-a9a0-8f4b9f85d792';
     const q = s => root.querySelector(s);
     const message = text => { q('#msbMessage').textContent = text; };
+    const sonarrTitles = new Map();
     const fields = [
       {name:'Bazarr', lower:'bazarr'},
       {name:'Sonarr', lower:'sonarr'},
@@ -144,8 +145,7 @@
       for (const item of items) {
         const opt = document.createElement('option');
         opt.value = String(item.Id);
-        opt.textContent = 'Sonarr ID ' + item.Id + ' · ' + item.StreamingUrl.replace(/^https:\/\/(?:www\.)?disneyplus\.com\//i, '');
-        // Use an ID-based label: this panel never guesses a Sonarr title.
+        opt.textContent = (sonarrTitles.get(Number(item.Id)) || 'Serie Sonarr') + ' (ID ' + item.Id + ')';
         select.append(opt);
       }
       select.value = items.some(x => String(x.Id) === previous) ? previous : '';
@@ -257,6 +257,14 @@
         if (!Array.isArray(result)) throw new Error('Formato inesperado');
         const cfg = await ApiClient.getPluginConfiguration(guid);
         const tracked = Array.isArray(cfg.TrackedItems) ? cfg.TrackedItems : [];
+        if (service === 'sonarr') {
+          sonarrTitles.clear();
+          for (const item of result) {
+            if (Number.isSafeInteger(Number(item.id)) && Number(item.id) > 0)
+              sonarrTitles.set(Number(item.id), item.title || 'Serie sin título');
+          }
+          refreshSingleSeries(cfg);
+        }
         const count = document.createElement('p');
         count.textContent = result.length + ' títulos encontrados';
         area.append(count);
