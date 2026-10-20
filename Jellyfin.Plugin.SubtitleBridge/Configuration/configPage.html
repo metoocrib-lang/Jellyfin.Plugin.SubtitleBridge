@@ -53,7 +53,7 @@
     <div id="msbMessage" role="status" aria-live="polite"></div>
     <hr>
     <h3>Biblioteca y preferencias</h3>
-    <p>Selecciona la plataforma de streaming para cada serie, guarda la URL pública de su página en esa plataforma y activa Automático. La tarea diaria de Jellyfin consultará Bazarr y solicitará extracción al agente local.</p>
+    <p>Selecciona la plataforma, el idioma, la URL pública y Automático por serie. Jellyfin revisa los episodios nuevos, sin tarea diaria. Si los catálogos usan distinta numeración, configura reglas de equivalencia.</p>
     <button is="emby-button" class="raised" type="button" id="msbLoadShows">Cargar series de Sonarr</button>
     <button is="emby-button" class="raised" type="button" id="msbLoadMovies">Cargar películas de Radarr</button>
     <div id="msbLibrary"></div>
@@ -191,6 +191,27 @@
       catch (e) { message(errorText(e, 'El agente no respondió.')); }
     });
 
+    function validateMapping(value) {
+      const rows = value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+      if (value.length > 4096 || rows.length > 100)
+        throw new Error('Demasiadas reglas de equivalencia (máximo 100 y 4096 caracteres).');
+      const rules = [];
+      for (const row of rows) {
+        const m = /^(\d{1,3})x(\d{1,3})(?:-(\d{1,3}))?\s*=\s*(\d{1,3})x(\d{1,3})$/i.exec(row);
+        if (!m)
+          throw new Error('Formato de equivalencia inválido: ' + row + '. Ejemplo: 17x14-26=2x1');
+        const [ss, start, end, ps, first] = [
+          Number(m[1]),Number(m[2]),Number(m[3] || m[2]),Number(m[4]),Number(m[5])
+        ];
+        const last = first + end - start;
+        if (ss > 100 || ps < 1 || ps > 100 || start < 1 || end < start || end > 999 || first < 1 || last > 999)
+          throw new Error('Temporada o episodio fuera de rango en: ' + row);
+        if (rules.some(r => (r.ss === ss && r.start <= end && start <= r.end)
+          || (r.ps === ps && r.first <= last && first <= r.last)))
+          throw new Error('Reglas superpuestas o varios episodios apuntando al mismo destino.');
+        rules.push({ss,start,end,ps,first,last});
+      }
+    }
     async function loadLibrary(service) {
       const area = q('#msbLibrary');
       area.replaceChildren();
@@ -224,12 +245,22 @@
           const streamingUrl = document.createElement('input');
           streamingUrl.setAttribute('is', 'emby-input');
           streamingUrl.type = 'url';
-          streamingUrl.placeholder = 'URL de la serie en la plataforma (https://www.disneyplus.com/series/...)';
+          streamingUrl.placeholder = 'URL de la serie (https://www.disneyplus.com/es-419/browse/entity-...)';
           streamingUrl.value = existing ? (existing.StreamingUrl || '') : '';
           streamingUrl.style.width = 'min(100%, 680px)';
           const streamingLabel = document.createElement('label');
           streamingLabel.textContent = 'Enlace de streaming de la serie ';
           streamingLabel.append(streamingUrl);
+          const mapping = document.createElement('textarea');
+          mapping.rows = 4;
+          mapping.placeholder = '17x1-13=1x1\\n17x14-26=2x1\\n17x27-40=3x1\\n17x41-50=4x1'.replaceAll('\\n','\n');
+          mapping.value = existing ? (existing.EpisodeMapping || '') : '';
+          mapping.style.width = 'min(100%, 680px)';
+          const mappingLabel = document.createElement('label');
+          mappingLabel.textContent = 'Equivalencias Sonarr → streaming (una por línea; vacío = misma numeración). ';
+          const mappingHelp = document.createElement('small');
+          mappingHelp.textContent = 'Ejemplo Bleach: 17x14-26=2x1. Si defines reglas, los episodios sin equivalencia se omiten. Bazarr conserva la numeración de Sonarr.';
+          mappingLabel.append(mapping, mappingHelp);
           const automatic = document.createElement('input');
           automatic.type = 'checkbox';
           automatic.checked = existing ? existing.Automatic !== false : true;
@@ -241,14 +272,15 @@
           button.textContent = existing ? 'Actualizar preferencias' : 'Seguir título';
           button.addEventListener('click', async () => {
             try {
+              if (service === 'sonarr') validateMapping(mapping.value);
               await saveConfig(config => {
                 const list = Array.isArray(config.TrackedItems) ? config.TrackedItems : [];
                 config.TrackedItems = list.filter(x => !(x.Service === service && Number(x.Id) === id));
-                config.TrackedItems.push({Service:service,Id:id,Language:language.value,Source:source.value,Automatic:automatic.checked,StreamingUrl:streamingUrl.value.trim()});
+                config.TrackedItems.push({Service:service,Id:id,Language:language.value,Source:source.value,Automatic:automatic.checked,StreamingUrl:streamingUrl.value.trim(),EpisodeMapping:service === 'sonarr' ? mapping.value.trim() : ''});
               });
               button.textContent = 'Actualizar preferencias';
-              message('Preferencias guardadas: ' + item.title + '. La revisión diaria se aplicará cuando conectes el agente.');
-            } catch (_) { message('Error al guardar el título.'); }
+              message('Preferencias guardadas: ' + item.title + '. El agente usará estas reglas en nuevos episodios y revisiones manuales.');
+            } catch (e) { message(e && e.message ? e.message : 'Error al guardar el título.'); }
           });
           const remove = document.createElement('button');
           remove.type = 'button';
@@ -262,7 +294,9 @@
               message('Título eliminado del seguimiento.');
             } catch (_) { message('Error al eliminar el título.'); }
           });
-          row.append(title,language,source,streamingLabel,autoLabel,button,remove);
+          row.append(title,language,source,streamingLabel);
+          if (service === 'sonarr') row.append(mappingLabel);
+          row.append(autoLabel,button,remove);
           if (service === 'sonarr') {
             const pendingButton = document.createElement('button');
             pendingButton.type = 'button';
