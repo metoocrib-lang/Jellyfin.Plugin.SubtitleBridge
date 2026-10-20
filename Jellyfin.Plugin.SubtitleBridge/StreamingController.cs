@@ -33,7 +33,7 @@ public sealed class StreamingController : ControllerBase
     {
         try
         {
-            return Ok(await DailyStreamingScanTask.ScanAsync(ct).ConfigureAwait(false));
+            return Ok(await StreamingScanDispatcher.ScanAsync(ct).ConfigureAwait(false));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception error) when (error is HttpRequestException or InvalidOperationException
@@ -48,7 +48,7 @@ public sealed class StreamingController : ControllerBase
     {
         var cfg = Plugin.Instance?.Configuration;
         if (cfg is null || string.IsNullOrWhiteSpace(cfg.BridgeToken) ||
-            !DailyStreamingScanTask.SafeHttpUri(cfg.BridgeUrl, out var uri))
+            !StreamingScanDispatcher.SafeHttpUri(cfg.BridgeUrl, out var uri))
             return BadRequest(new { error = "Configura la URL y el token del agente local." });
         try
         {

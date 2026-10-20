@@ -1,41 +1,23 @@
-using System.Globalization;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Jellyfin.Plugin.SubtitleBridge.Configuration;
-using MediaBrowser.Model.Tasks;
 
 namespace Jellyfin.Plugin.SubtitleBridge;
 
-/// <summary>Jellyfin-managed daily scan. Never starts Chromium inside Jellyfin.</summary>
-public sealed class DailyStreamingScanTask : IScheduledTask
+/// <summary>
+/// Reusable scan invoked by the library event and the manual Jellyfin button.
+/// No daily schedule is registered; episode events drive automatic attempts.
+/// </summary>
+public static class StreamingScanDispatcher
 {
     private static readonly HttpClient Http = new(new SocketsHttpHandler { AllowAutoRedirect = false })
     {
         Timeout = TimeSpan.FromSeconds(25)
     };
 
-    public string Name => "Moonfin Subtitle Bridge: revisar streaming";
-    public string Key => "MoonfinSubtitleBridgeDailyStreamingScan";
-    public string Description => "Consulta subtítulos faltantes en Bazarr y solicita su extracción al agente local.";
-    public string Category => "Moonfin Subtitle Bridge";
-
-    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() =>
-    [
-        new TaskTriggerInfo {
-            Type = TaskTriggerInfoType.IntervalTrigger,
-            IntervalTicks = TimeSpan.FromHours(24).Ticks
-        }
-    ];
-
-    public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
-    {
-        progress.Report(0);
-        await ScanAsync(cancellationToken).ConfigureAwait(false);
-        progress.Report(100);
-    }
-
-    public static async Task<ScanSummary> ScanAsync(CancellationToken ct)
+    public static async Task<ScanSummary> ScanAsync(
+        CancellationToken ct, int? onlySeriesId = null, int? onlySeason = null, int? onlyEpisode = null)
     {
         var cfg = Plugin.Instance?.Configuration ?? throw new InvalidOperationException("Plugin no inicializado");
         if (string.IsNullOrWhiteSpace(cfg.BazarrApiKey) ||
@@ -45,8 +27,8 @@ public sealed class DailyStreamingScanTask : IScheduledTask
             throw new InvalidOperationException("Configura Bazarr y el agente local antes de la revisión.");
 
         var tracked = (cfg.TrackedItems ?? []).Where(x =>
-            x.Service.Equals("sonarr", StringComparison.OrdinalIgnoreCase)
-            && x.Automatic && x.Source is "disney" or "netflix" or "prime" or "max" or "apple"
+            string.Equals(x.Service, "sonarr", StringComparison.OrdinalIgnoreCase)
+            && x.Automatic && (x.Source is "disney" or "netflix" or "prime" or "max" or "apple")
             && x.Id > 0 && !string.IsNullOrWhiteSpace(x.StreamingUrl))
             .ToDictionary(x => x.Id);
         if (tracked.Count == 0)
@@ -83,6 +65,10 @@ public sealed class DailyStreamingScanTask : IScheduledTask
                 var parts = (episodeTag.GetString() ?? "").Split('x', 2);
                 if (parts.Length != 2 || !int.TryParse(parts[0], out var season) ||
                     !int.TryParse(parts[1], out var episode) || season < 0 || episode < 1)
+                    continue;
+                if ((onlySeriesId.HasValue && seriesId != onlySeriesId.Value)
+                    || (onlySeason.HasValue && season != onlySeason.Value)
+                    || (onlyEpisode.HasValue && episode != onlyEpisode.Value))
                     continue;
                 if (!ep.TryGetProperty("missing_subtitles", out var languages) ||
                     languages.ValueKind != JsonValueKind.Array ||

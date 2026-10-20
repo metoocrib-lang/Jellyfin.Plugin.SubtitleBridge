@@ -58,7 +58,7 @@ Abre `http://localhost:6080/vnc.html` y utiliza **VNC_PASSWORD**, que solo es la
 
 ## 5. Ejecutar la revisión y comprobar resultados
 
-Desde el plugin pulsa “Revisar ahora”, o ejecuta en Jellyfin Dashboard → Tareas programadas → “Moonfin Subtitle Bridge: revisar streaming”. Cuando el plugin y Bazarr detecten episodios pendientes en el idioma elegido, el agente los encolará (máximo 30 por ejecución, uno a la vez). Consulta el botón “Consultar estado y trabajos” para ver códigos:
+Cuando Jellyfin registre un episodio nuevo, el plugin comprobará automáticamente su serie contra Sonarr mediante TVDB y verificará que Bazarr lo considera pendiente en el idioma elegido. Entonces encolará solo ese capítulo. También puedes pulsar “Revisar ahora” para procesar hasta 30 episodios pendientes de todas las series seleccionadas (recuperación manual). No hay revisión diaria. Consulta el botón “Consultar estado y trabajos” para ver códigos:
 
 - `en_cola`, `procesando`: aún no se ha descargado nada.
 - `enviado_a_bazarr`: Bazarr aceptó el archivo, comprueba la reproducción en Jellyfin.

@@ -73,9 +73,10 @@
       <button type="button" is="emby-button" class="raised" id="msbStartDisney">Iniciar sesión en Disney+ (navegador local)</button>
       <button type="button" is="emby-button" class="raised" id="msbStreamingStatus">Consultar estado y trabajos</button>
       <pre id="msbStreamingOutput" style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite"></pre>
-      <h3>Revisión diaria</h3>
-      <p>Jellyfin agrega la tarea “Moonfin Subtitle Bridge: revisar streaming” en Dashboard → Tareas programadas, con intervalo inicial de 24 horas. También puedes ejecutarla manualmente desde aquí.</p>
-      <button type="button" is="emby-button" class="raised" id="msbStreamingScan">Revisar ahora</button>
+      <h3>Detección de nuevos episodios</h3>
+      <p>La búsqueda se inicia cuando Jellyfin agrega un episodio físico nuevo a su biblioteca. El plugin espera unos segundos para completar metadatos, comprueba la coincidencia TVDB entre Jellyfin y Sonarr y verifica el idioma pendiente en Bazarr. No hace revisiones diarias. Si Jellyfin no dispone del identificador TVDB, no intentará asociar el episodio.</p>
+      <p>También puedes revisar manualmente las series seleccionadas para recuperar episodios agregados mientras Jellyfin estuvo apagado.</p>
+      <button type="button" is="emby-button" class="raised" id="msbStreamingScan">Revisar ahora (manual)</button>
       <p><strong>Experimental:</strong> Disney+ intentará identificar episodios por enlaces etiquetados inequívocamente; si el catálogo no expone esos datos, aparecerá “episodio_no_identificado” y no se descargará nada. Netflix, Prime, Max y Apple TV+ aún no tienen extractores operativos.</p>
     </details>
   </div></div>

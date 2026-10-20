@@ -20,7 +20,7 @@ def publish(manifest: Path, archive: Path, repo: str, tag: str):
     checksum = hashlib.md5(archive.read_bytes()).hexdigest()
     versions = [{
         "version": VERSION,
-        "changelog": "Panel de cuentas y URLs de streaming; revisión diaria en Jellyfin y cola experimental Disney+ en contenedor privado.",
+        "changelog": "Panel de cuentas y URLs de streaming; activación por episodio nuevo en Jellyfin y cola experimental Disney+ en contenedor privado.",
         "targetAbi": ABI,
         "sourceUrl": f"https://github.com/{repo}/releases/download/{tag}/{archive.name}",
         "checksum": checksum,
