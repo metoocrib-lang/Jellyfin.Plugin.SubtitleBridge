@@ -20,7 +20,7 @@ def publish(manifest: Path, archive: Path, repo: str, tag: str):
     checksum = hashlib.md5(archive.read_bytes()).hexdigest()
     versions = [{
         "version": VERSION,
-        "changelog": "Botón Procesar un episodio desde Jellyfin, con confirmación y envío exclusivo del capítulo pendiente seleccionado a Disney+ y Bazarr.",
+        "changelog": "Procesamiento manual de un episodio desde Jellyfin y buscador instantáneo de series Sonarr y películas Radarr; selección exclusiva y segura de Bazarr.",
         "targetAbi": ABI,
         "sourceUrl": f"https://github.com/{repo}/releases/download/{tag}/{archive.name}",
         "checksum": checksum,
