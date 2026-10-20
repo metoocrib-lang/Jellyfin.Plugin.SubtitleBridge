@@ -70,6 +70,10 @@ jobs:
             gh release create "$TAG" "$ZIP" --target "$GITHUB_SHA" --title "$TAG - Jellyfin 12.2 experimental" --prerelease --notes "Plugin C# nativo experimental. Requiere instalar por separado el agente Docker; extracción de Disney+ sin validar en sesión real."
           else
             gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$(basename "$ZIP")"
+            mkdir -p dist/released
+            gh release download "$TAG" --pattern "$(basename "$ZIP")" --dir dist/released --clobber
+            # The checksum must refer to the exact released bytes, not a newly rebuilt ZIP.
+            cp "dist/released/$(basename "$ZIP")" "$ZIP"
           fi
       - name: Write plugin repository catalog
         env:

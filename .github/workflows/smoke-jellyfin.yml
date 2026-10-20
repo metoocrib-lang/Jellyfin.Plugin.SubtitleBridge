@@ -1,0 +1,64 @@
+name: Jellyfin 12.2 container smoke test
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compile native plugin
+        run: dotnet build Jellyfin.Plugin.SubtitleBridge/Jellyfin.Plugin.SubtitleBridge.csproj -c Release
+      - name: Start Jellyfin 12.2 with plugin installed
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p smoke/config/plugins/MoonfinSubtitleBridge_0.3.1.0
+          cp Jellyfin.Plugin.SubtitleBridge/bin/Release/net10.0/Jellyfin.Plugin.SubtitleBridge.dll smoke/config/plugins/MoonfinSubtitleBridge_0.3.1.0/
+          chmod -R a+rwX smoke
+          docker run -d --name smoke-jellyfin -p 127.0.0.1:18096:8096 -v "$PWD/smoke/config:/config" jellyfin/jellyfin:12.2
+          ok=0
+          for i in $(seq 1 60); do
+            if curl --max-time 3 -fsS http://127.0.0.1:18096/health; then ok=1; break; fi
+            sleep 3
+          done
+          if [ "$ok" != 1 ]; then
+            docker logs smoke-jellyfin --tail 150
+            exit 1
+          fi
+          echo
+          echo "Jellyfin health endpoint is healthy."
+          # A fresh Jellyfin server returns HTTP 503 for normal endpoints until the
+          # first-run wizard is completed. This is a disposable isolated CI instance.
+          setup=$(curl --max-time 5 -sS -o /tmp/jf-setup.txt -w '%{http_code}' -X POST http://127.0.0.1:18096/Startup/Complete || true)
+          echo "Complete initial setup status: $setup"
+          echo "Route probe:"
+          code=000
+          for i in $(seq 1 30); do
+            code=$(curl --max-time 5 -sS -o /tmp/moonfin-probe.txt -w '%{http_code}' http://127.0.0.1:18096/MoonfinSubtitleBridge/health || true)
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then break; fi
+            sleep 2
+          done
+          echo "Unauthenticated plugin controller HTTP code: $code"
+          echo "Relevant startup lines:"
+          docker logs smoke-jellyfin 2>&1 | grep -Ei 'SubtitleBridge|Moonfin|plugin' | tail -40 || true
+          if [ "$code" != "401" ] && [ "$code" != "403" ]; then
+            echo "Expected admin-only plugin route (401/403), not $code"
+            exit 1
+          fi
+      - name: Logs on failure
+        if: failure()
+        run: docker logs smoke-jellyfin --tail 250 || true
+      - name: Cleanup
+        if: always()
+        run: docker rm -f smoke-jellyfin || true
