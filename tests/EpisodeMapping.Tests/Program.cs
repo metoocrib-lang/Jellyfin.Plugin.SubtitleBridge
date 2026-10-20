@@ -50,3 +50,59 @@ Invalid("17x1-13=2x0");
 Invalid("17x1-13;17x14-26");
 Invalid("ThisIsNotMapping");
 Console.WriteLine("EpisodeMapper: all checks passed.");
+
+
+// A manual request may only send ONE existing Sonarr episode, never infer an
+// episode from its position or mutate Sonarr/Bazarr IDs.
+using var bazarr = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(new
+{
+    data = new[] {
+        new {
+            sonarrSeriesId = 42, sonarrEpisodeId = 2800, season = 17, episode = 2,
+            path = "/tv/Bleach/S17E02.mkv",
+            missing_subtitles = new[] { new { code2 = "es", forced = false, hi = false } }
+        }
+    }
+}));
+var plan = SingleEpisodePlanner.Plan(bazarr.RootElement, 42, 17, 2, "es", "disney",
+    "https://www.disneyplus.com/es-419/browse/entity-571475d5-8b1a-453f-a57f-26bb4dd13304", bleach);
+Expect(plan is not null, "Plan found exact episode");
+Expect(plan!.SonarrSeriesId == 42 && plan.SonarrEpisodeId == 2800, "Original IDs preserved");
+Expect(plan.StreamingSeason == 1 && plan.StreamingEpisode == 2, "Season and episode mapped");
+Expect(SingleEpisodePlanner.Plan(bazarr.RootElement, 42, 17, 3, "es", "disney",
+    plan.StreamingUrl, bleach) is null, "Other episode must not be submitted");
+Expect(SingleEpisodePlanner.Plan(bazarr.RootElement, 99, 17, 2, "es", "disney",
+    plan.StreamingUrl, bleach) is null, "Wrong Sonarr series must not be submitted");
+Expect(SingleEpisodePlanner.Plan(bazarr.RootElement, 42, 17, 2, "en", "disney",
+    plan.StreamingUrl, bleach) is null, "Only requested missing language");
+
+using var withoutPath = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(new
+{
+    data = new[] {
+        new { sonarrSeriesId = 42, sonarrEpisodeId = 2800, season = 17, episode = 2,
+            path = "", missing_subtitles = new[]{new {code2="es", forced=false, hi=false}} }
+    }
+}));
+Expect(SingleEpisodePlanner.Plan(withoutPath.RootElement, 42, 17, 2, "es", "disney",
+    plan.StreamingUrl, bleach) is null, "Media path is mandatory");
+
+using var duplicate = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(new {
+    data = new[] {
+        new {sonarrSeriesId=42,sonarrEpisodeId=2800,season=17,episode=2,path="/tv/a.mkv",
+             missing_subtitles=new[]{new{code2="es",forced=false,hi=false}}},
+        new {sonarrSeriesId=42,sonarrEpisodeId=9999,season=17,episode=2,path="/tv/b.mkv",
+             missing_subtitles=new[]{new{code2="es",forced=false,hi=false}}}
+    }
+}));
+try {
+    SingleEpisodePlanner.Plan(duplicate.RootElement, 42, 17, 2, "es", "disney",
+        plan.StreamingUrl, bleach);
+    throw new Exception("Ambiguous duplicates were accepted");
+} catch (InvalidOperationException) { }
+
+try {
+    SingleEpisodePlanner.Plan(bazarr.RootElement, 42, 16, 1, "es", "disney",
+        plan.StreamingUrl, bleach);
+    throw new Exception("Unmapped season was accepted");
+} catch (InvalidOperationException) { }
+Console.WriteLine("SingleEpisodePlanner: all checks passed.");
