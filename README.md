@@ -1,45 +1,42 @@
-# Moonfin Subtitle Bridge — Plugin Jellyfin 12.2
+# Moonfin Subtitle Bridge — Jellyfin 12.2
 
-Complemento nativo **experimental** para Jellyfin 12.2 (.NET 10), diseñado para gestionar series e idiomas desde Dashboard → Plugins y coordinar subtítulos con Bazarr y un agente Docker separado.
+Plugin nativo para administrar series, idiomas y fuentes de subtítulos desde el Dashboard de Jellyfin.
 
-[![Build Jellyfin 12.2](https://github.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/actions/workflows/build.yml/badge.svg)](https://github.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/actions/workflows/build.yml)
+## Instalación
 
-## Instalar desde el catálogo de Jellyfin
+**Repositorio Jellyfin** (Dashboard → Plugins → Repositories → Add):
+```
+https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
+```
 
-1. En Jellyfin 12.2: **Dashboard → Plugins → Repositories → Add Repository**.
-2. Nombre: `Moonfin Subtitle Bridge`.
-3. URL:
-   ```text
-   https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
-   ```
-4. Guardar; **Plugins → Catalog → Moonfin Subtitle Bridge → Install**; reiniciar Jellyfin si lo solicita.
-5. Abrir los ajustes del plugin. Conectar el servicio Docker auxiliar y probar comunicación.
+En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versiones: 0.4.0.0 (Jellyfin 12.2, .NET 10).
 
-**Paquete compilado:** [GitHub Release v0.3.1.0](https://github.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/releases/tag/v0.3.1.0).
+## Configurar URLs de Bazarr / Sonarr / Radarr
 
-**Manual de instalación, red Docker y diagnóstico:** [PRUEBAS-JELLYFIN-12.2.md](docs/PRUEBAS-JELLYFIN-12.2.md).
+En los ajustes del plugin coloca las direcciones accesibles **desde el contenedor Jellyfin** y las claves API de cada servicio; por ejemplo, si todos comparten una red Docker:
 
-## Estado y alcance
+| Servicio | URL ilustrativa | ¿Dónde está la clave API? |
+|---|---|---|
+| Bazarr | `http://bazarr:6767` | Settings → General → Security |
+| Sonarr | `http://sonarr:8989` | Settings → General → Security |
+| Radarr | `http://radarr:7878` | Settings → General → Security |
 
-- Plugin C# nativo: compilado en GitHub Actions para Jellyfin 12.2; una prueba con un contenedor Jellyfin 12.2 aislado confirmó que cargó el DLL y protegió la ruta de API (401 sin credenciales).
-- Selección de series, idioma, proveedor y modo automático desde la página de configuración; estas funciones requieren que el **agente Docker** esté instalado y conectado.
-- Bazarr/Sonarr: integración implementada en el prototipo del agente, pendiente de probar en el servidor del usuario.
-- **Disney+ experimental:** el agente anterior requiere URL por episodio, sesión iniciada por el usuario y pistas accesibles al navegador. **No se ha validado** con la cuenta real. Tampoco existe todavía búsqueda autónoma de toda una temporada.
-- Otras plataformas de streaming todavía no cuentan con extractores automáticos.
-- El agente completo del prototipo v0.3 está disponible en el paquete fuente compartido previamente en la conversación; su incorporación a este repositorio está pendiente. Este repositorio **sí** distribuye el complemento DLL nativo.
+Son ejemplos: usa los nombres Docker reales, IP de LAN o URL del proxy con ruta base si corresponde. Guarda las conexiones antes de presionar **Probar**. Las claves no se muestran en la pantalla al volver a abrirla; dejar el campo vacío preserva la clave guardada.
 
-## Desarrollo
+El servidor Jellyfin llama a las APIs de los servicios directamente, con `X-Api-Key` (no desde JavaScript ni el navegador). Los endpoints del plugin exigen sesión de administrador. Los servicios pueden usarse sin instalar el agente Docker.
 
-```bash
+- **Probar Bazarr/Sonarr/Radarr**: conexión autenticada y versión de servicio (si la API la devuelve).
+- **Cargar series/películas**: obtiene listas de Sonarr y Radarr sin agente.
+- **Seguir título**: guarda en la configuración del plugin Jellyfin el idioma, fuente y opción de seguimiento automático.
+
+**Limitación importante:** guardar el seguimiento todavía NO inicia descargas ni envía peticiones a Bazarr: falta implementar el planificador y la vinculación de episodios de Disney+. El agente de navegador es opcional y experimental, y sigue siendo necesario para intentar extraer subtítulos de Disney+ en una sesión autorizada. Ni el plugin ni la configuración directa evaden DRM.
+
+## Desarrollo y pruebas
+
+```sh
 dotnet build Jellyfin.Plugin.SubtitleBridge/Jellyfin.Plugin.SubtitleBridge.csproj -c Release
 ```
 
-Las versiones instalables se generan por GitHub Actions y se anuncian mediante `manifest.json`. **No instales el ZIP de código fuente como plugin.**
+GitHub Actions compila, genera ZIP y ejecuta un smoke test con Jellyfin 12.2 Docker. No afirma probar tu red Docker, la página con claves reales o la extracción de Disney+.
 
-## Seguridad y limitaciones
-
-El plugin no necesita ni almacena credenciales de Disney+; el usuario inicia sesión directamente en el navegador privado del agente. No subas a GitHub archivos `.env`, API keys, tokens, perfiles de navegador ni cookies. Mantén los puertos Docker auxiliares accesibles únicamente dentro de tu red privada. No se eluden DRM ni controles de acceso.
-
-GitHub Actions no tiene acceso a los contenedores privados de tu red local: para la prueba integrada de Jellyfin/Bazarr/Disney+ se necesita desplegar el agente y validar desde tu equipo.
-
-Proyecto independiente no afiliado a Jellyfin, Moonfin, Bazarr ni plataformas de streaming.
+Nunca publiques API keys, contraseñas, cookies ni perfiles de navegador en GitHub. El plugin almacena las API keys en la configuración del servidor Jellyfin (protege tu directorio /config, respaldos y usuarios administradores). Proyecto independiente y no afiliado a Jellyfin ni plataformas.

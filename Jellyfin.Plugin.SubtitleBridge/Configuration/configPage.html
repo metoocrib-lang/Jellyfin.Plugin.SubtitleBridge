@@ -5,122 +5,223 @@
 <div id="SubtitleBridgePage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
   <div data-role="content"><div class="content-primary">
     <h2>Moonfin Subtitle Bridge</h2>
-    <p>Jellyfin 12.2 · Configura el agente Docker en tu red local y selecciona series.</p>
-    <form id="msbSettings">
-      <div class="inputContainer"><label class="inputLabel" for="msbUrl">URL interna del agente</label>
-        <input is="emby-input" id="msbUrl" type="url" required placeholder="http://moonfin-subtitle-bridge:8787"></div>
-      <div class="inputContainer"><label class="inputLabel" for="msbToken">Token local del agente</label>
-        <input is="emby-input" id="msbToken" type="password" autocomplete="off" required></div>
-      <button is="emby-button" class="raised button-submit" type="submit">Guardar conexión</button>
+    <p>Jellyfin 12.2 · Conecta Bazarr, Sonarr y Radarr directamente desde Jellyfin.</p>
+    <p>Las URL deben ser accesibles <strong>desde el contenedor Jellyfin</strong>, no solamente desde este navegador.</p>
+    <form id="msbConnections">
+      <div class="verticalSection">
+        <h3>Bazarr (subtítulos)</h3>
+        <div class="inputContainer">
+          <label class="inputLabel" for="msbBazarrUrl">URL Bazarr</label>
+          <input id="msbBazarrUrl" is="emby-input" type="url" placeholder="http://bazarr:6767" autocomplete="off"/>
+        </div>
+        <div class="inputContainer">
+          <label class="inputLabel" for="msbBazarrKey">API key de Bazarr</label>
+          <input id="msbBazarrKey" is="emby-input" type="password" placeholder="Dejar vacío para conservar la clave guardada" autocomplete="new-password"/>
+        </div>
+        <button is="emby-button" class="raised" type="button" data-test-service="bazarr">Probar Bazarr</button>
+        <span id="msbBazarrStatus" role="status"></span>
+      </div>
+      <div class="verticalSection">
+        <h3>Sonarr (series)</h3>
+        <div class="inputContainer">
+          <label class="inputLabel" for="msbSonarrUrl">URL Sonarr</label>
+          <input id="msbSonarrUrl" is="emby-input" type="url" placeholder="http://sonarr:8989" autocomplete="off"/>
+        </div>
+        <div class="inputContainer">
+          <label class="inputLabel" for="msbSonarrKey">API key de Sonarr</label>
+          <input id="msbSonarrKey" is="emby-input" type="password" placeholder="Dejar vacío para conservar la clave guardada" autocomplete="new-password"/>
+        </div>
+        <button is="emby-button" class="raised" type="button" data-test-service="sonarr">Probar Sonarr</button>
+        <span id="msbSonarrStatus" role="status"></span>
+      </div>
+      <div class="verticalSection">
+        <h3>Radarr (películas)</h3>
+        <div class="inputContainer">
+          <label class="inputLabel" for="msbRadarrUrl">URL Radarr</label>
+          <input id="msbRadarrUrl" is="emby-input" type="url" placeholder="http://radarr:7878" autocomplete="off"/>
+        </div>
+        <div class="inputContainer">
+          <label class="inputLabel" for="msbRadarrKey">API key de Radarr</label>
+          <input id="msbRadarrKey" is="emby-input" type="password" placeholder="Dejar vacío para conservar la clave guardada" autocomplete="new-password"/>
+        </div>
+        <button is="emby-button" class="raised" type="button" data-test-service="radarr">Probar Radarr</button>
+        <span id="msbRadarrStatus" role="status"></span>
+      </div>
+      <button is="emby-button" type="submit" class="raised button-submit">Guardar conexiones</button>
     </form>
-    <p><button is="emby-button" class="raised" id="msbHealth">Probar conexión</button>
-      <button is="emby-button" class="raised" id="msbRefresh">Actualizar series</button></p>
     <div id="msbMessage" role="status" aria-live="polite"></div>
-    <div id="msbShows"></div>
     <hr>
-    <button is="emby-button" class="raised" id="msbScan">Ejecutar búsqueda/importación</button>
-    <p>Disney+ está en fase experimental: el agente requiere una URL por episodio, autenticación directa en su navegador y un subtítulo accesible.</p>
+    <h3>Biblioteca y preferencias</h3>
+    <p>Estas preferencias se conservan dentro de Jellyfin. La extracción desatendida de Disney+ requerirá conectar un agente de navegador más adelante.</p>
+    <button is="emby-button" class="raised" type="button" id="msbLoadShows">Cargar series de Sonarr</button>
+    <button is="emby-button" class="raised" type="button" id="msbLoadMovies">Cargar películas de Radarr</button>
+    <div id="msbLibrary"></div>
+    <hr>
+    <details>
+      <summary>Agente opcional de extracción de Disney+ (experimental)</summary>
+      <form id="msbAgentForm">
+        <div class="inputContainer"><label class="inputLabel" for="msbUrl">URL interna del agente</label>
+          <input is="emby-input" id="msbUrl" type="url" placeholder="http://moonfin-subtitle-bridge:8787"/></div>
+        <div class="inputContainer"><label class="inputLabel" for="msbToken">Token local del agente</label>
+          <input is="emby-input" id="msbToken" type="password" autocomplete="new-password" placeholder="Dejar vacío para conservar el token"/></div>
+        <button is="emby-button" type="submit" class="raised">Guardar agente</button>
+        <button is="emby-button" type="button" id="msbAgentHealth">Probar agente</button>
+      </form>
+      <p>La automatización del navegador aún necesita trabajo y no se activa con las conexiones directas a Sonarr/Radarr/Bazarr.</p>
+    </details>
   </div></div>
   <script>
-    (function () {
-      const root = document.querySelector('#SubtitleBridgePage');
-      const guid = 'b8e43169-c5f4-41d3-a9a0-8f4b9f85d792';
-      const q = s => root.querySelector(s);
-      const msg = s => { q('#msbMessage').textContent = s; };
-      function api(path, body) {
-        return ApiClient.ajax({
-          type: body === undefined ? 'GET' : 'POST',
-          url: ApiClient.getUrl('MoonfinSubtitleBridge/' + path),
-          contentType: 'application/json',
-          data: body === undefined ? undefined : JSON.stringify(body),
-          dataType: 'json'
-        });
-      }
-      async function loadConfig() {
-        const cfg = await ApiClient.getPluginConfiguration(guid);
-        q('#msbUrl').value = cfg.BridgeUrl || '';
-        q('#msbToken').value = cfg.BridgeToken || '';
-      }
-      q('#msbSettings').addEventListener('submit', async ev => {
-        ev.preventDefault();
-        try {
-          const cfg = await ApiClient.getPluginConfiguration(guid);
-          cfg.BridgeUrl = q('#msbUrl').value.trim();
-          cfg.BridgeToken = q('#msbToken').value.trim();
-          await ApiClient.updatePluginConfiguration(guid, cfg);
-          msg('Configuración guardada.');
-        } catch (err) { msg('Error guardando configuración.'); }
+  (function () {
+    const root = document.querySelector('#SubtitleBridgePage');
+    const guid = 'b8e43169-c5f4-41d3-a9a0-8f4b9f85d792';
+    const q = s => root.querySelector(s);
+    const message = text => { q('#msbMessage').textContent = text; };
+    const fields = [
+      {name:'Bazarr', lower:'bazarr'},
+      {name:'Sonarr', lower:'sonarr'},
+      {name:'Radarr', lower:'radarr'}
+    ];
+    function api(path) {
+      return ApiClient.ajax({
+        type: 'GET',
+        url: ApiClient.getUrl('MoonfinSubtitleBridge/' + path),
+        dataType: 'json'
       });
-      q('#msbHealth').addEventListener('click', async () => {
-        try { const r = await api('health'); msg('Conexión: ' + (r.status || 'correcta')); }
-        catch (_) { msg('Sin conexión. Comprueba la red Docker y el token.'); }
-      });
-      async function renderShows() {
-        msg('Consultando Jellyfin y Bazarr...');
-        try {
-          const res = await api('series');
-          const area = q('#msbShows'); area.replaceChildren();
-          const watches = res.watches || [];
-          const findWatch = id => Array.isArray(watches)
-            ? watches.find(w => String(w.jellyfin_id) === String(id))
-            : watches[id];
-          for (const show of res.series || []) {
-            if (!show.bazarr_id) continue;
-            const node = document.createElement('div');
-            node.className = 'verticalSection';
-            const h = document.createElement('h3'); h.textContent = show.title || 'Serie'; node.append(h);
-            const language = document.createElement('select'); language.setAttribute('is','emby-select');
-            for (const [v,t] of [['es','Español'],['en','Inglés'],['es-MX','Español (México)']]) {
-              const o = document.createElement('option'); o.value=v; o.textContent=t; language.append(o);
-            }
-            const source = document.createElement('select'); source.setAttribute('is','emby-select');
-            for (const [v,t] of [['disney','Disney+'],['bazarr','Proveedores Bazarr']]) {
-              const o=document.createElement('option');o.value=v;o.textContent=t;source.append(o);
-            }
-            const automatic = document.createElement('input'); automatic.type='checkbox'; automatic.checked=true;
-            const watch = findWatch(show.jellyfin_id);
-            if (watch) {
-              language.value=watch.lang||'es'; source.value=watch.source||'bazarr';
-              automatic.checked=watch.automatic===true;
-            }
-            const save = document.createElement('button'); save.type='button'; save.textContent='Guardar serie';
-            save.addEventListener('click', async () => {
-              try { await api('watch',{id:String(show.jellyfin_id),lang:language.value,source:source.value,automatic:automatic.checked}); msg('Serie guardada: '+show.title); }
-              catch (_) { msg('No se pudo guardar la serie.'); }
-            });
-            const remove=document.createElement('button');remove.type='button';remove.textContent='Dejar de seguir';
-            remove.addEventListener('click',async()=>{try{await api('remove',{id:String(show.jellyfin_id)});msg('Serie eliminada');}catch(_){msg('No se pudo eliminar');}});
-            const episodes=document.createElement('button');episodes.type='button';episodes.textContent='Ver episodios';
-            episodes.addEventListener('click',async()=>{
-              let box=node.querySelector('.msb-episodes');if(!box){box=document.createElement('div');box.className='msb-episodes';node.append(box);}
-              box.replaceChildren();
-              try {
-                const r=await api('episodes?id='+encodeURIComponent(show.jellyfin_id));
-                for(const ep of r.episodes||[]){
-                  const row=document.createElement('div');
-                  const caption=document.createElement('span');caption.textContent='T'+ep.season+' E'+ep.episode+' — '+(ep.title||'')+' ';
-                  const field=document.createElement('input');field.type='url';field.placeholder='https://www.disneyplus.com/play/...';field.value=ep.url||'';
-                  const saveUrl=document.createElement('button');saveUrl.type='button';saveUrl.textContent='Vincular';
-                  saveUrl.addEventListener('click',async()=>{try{await api('link',{id:String(show.jellyfin_id),episode_id:ep.id,episode_url:field.value.trim()});msg('Episodio vinculado.');}catch(_){msg('Error al vincular el episodio.');}});
-                  row.append(caption,field,saveUrl);box.append(row);
-                }
-              } catch (_) { msg('Error consultando episodios. Selecciona primero la serie.'); }
-            });
-            const container=document.createElement('div');
-            const title=document.createElement('label');title.textContent='Idioma / fuente / automático ';
-            const chklabel=document.createElement('label');chklabel.textContent='Automático ';chklabel.append(automatic);
-            container.append(language,source,chklabel,save,remove,episodes);
-            node.append(title,container);area.append(node);
+    }
+    function errorText(e, defaultMessage) {
+      return (e && e.responseJSON && e.responseJSON.error) || defaultMessage;
+    }
+    async function saveConfig(mutator) {
+      const config = await ApiClient.getPluginConfiguration(guid);
+      mutator(config);
+      await ApiClient.updatePluginConfiguration(guid, config);
+    }
+    async function loadConfig() {
+      const cfg = await ApiClient.getPluginConfiguration(guid);
+      for (const service of fields) {
+        q('#msb' + service.name + 'Url').value = cfg[service.name + 'Url'] || '';
+        q('#msb' + service.name + 'Key').value = '';
+      }
+      q('#msbUrl').value = cfg.BridgeUrl || '';
+      q('#msbToken').value = '';
+    }
+    q('#msbConnections').addEventListener('submit', async function (event) {
+      event.preventDefault();
+      try {
+        await saveConfig(cfg => {
+          for (const service of fields) {
+            const url = q('#msb' + service.name + 'Url').value.trim();
+            const key = q('#msb' + service.name + 'Key').value.trim();
+            cfg[service.name + 'Url'] = url;
+            if (key) cfg[service.name + 'ApiKey'] = key;
           }
-          msg('Series cargadas.');
-        } catch (_) { msg('No se pudieron cargar las series; configura la conexión primero.'); }
-      }
-      q('#msbRefresh').addEventListener('click',renderShows);
-      q('#msbScan').addEventListener('click', async () => {
-        try { await api('scan',{}); msg('Búsqueda solicitada.'); }
-        catch (_) { msg('Error al solicitar el trabajo.'); }
+        });
+        for (const service of fields) q('#msb' + service.name + 'Key').value = '';
+        message('Conexiones guardadas. Ya puedes probar cada servicio.');
+      } catch (_) { message('No fue posible guardar las conexiones.'); }
+    });
+    for (const btn of root.querySelectorAll('[data-test-service]')) {
+      btn.addEventListener('click', async () => {
+        const service = btn.getAttribute('data-test-service');
+        const serviceName = service[0].toUpperCase() + service.slice(1);
+        const target = q('#msb' + serviceName + 'Status');
+        target.textContent = ' Comprobando…';
+        try {
+          const result = await api('connections/test?service=' + encodeURIComponent(service));
+          target.textContent = ' ' + (result.version ? 'Conectado · versión ' + result.version : 'Conectado correctamente');
+        } catch (e) { target.textContent = ' ' + errorText(e, 'No se pudo conectar. Revisa URL, API key y red Docker.'); }
       });
-      root.addEventListener('pageshow',loadConfig);
-    }());
+    }
+    q('#msbAgentForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      try {
+        await saveConfig(cfg => {
+          cfg.BridgeUrl = q('#msbUrl').value.trim();
+          const token = q('#msbToken').value.trim();
+          if (token) cfg.BridgeToken = token;
+        });
+        q('#msbToken').value = '';
+        message('Agente guardado.');
+      } catch (_) { message('Error al guardar el agente.'); }
+    });
+    q('#msbAgentHealth').addEventListener('click', async () => {
+      try { await api('health'); message('El agente respondió correctamente.'); }
+      catch (e) { message(errorText(e, 'El agente no respondió.')); }
+    });
+
+    async function loadLibrary(service) {
+      const area = q('#msbLibrary');
+      area.replaceChildren();
+      message('Consultando ' + (service === 'sonarr' ? 'Sonarr' : 'Radarr') + '…');
+      try {
+        const result = await api('connections/library?service=' + service);
+        if (!Array.isArray(result)) throw new Error('Formato inesperado');
+        const cfg = await ApiClient.getPluginConfiguration(guid);
+        const tracked = Array.isArray(cfg.TrackedItems) ? cfg.TrackedItems : [];
+        const count = document.createElement('p');
+        count.textContent = result.length + ' títulos encontrados';
+        area.append(count);
+        for (const item of result) {
+          const id = Number(item.id);
+          if (!Number.isSafeInteger(id) || id < 1) continue;
+          const row = document.createElement('div');
+          row.className = 'verticalSection';
+          const title = document.createElement('h4');
+          title.textContent = item.title || 'Sin título';
+          const existing = tracked.find(x => x.Service === service && Number(x.Id) === id);
+          const language = document.createElement('select');
+          for (const [key, label] of [['es','Español'],['es-MX','Español (México)'],['en','Inglés'],['fr','Francés']]) {
+            const opt = document.createElement('option'); opt.value = key; opt.textContent = label; language.append(opt);
+          }
+          language.value = existing ? existing.Language : 'es';
+          const source = document.createElement('select');
+          for (const [key, label] of [['bazarr','Proveedores Bazarr'],['disney','Disney+ (experimental)']]) {
+            const opt = document.createElement('option'); opt.value = key; opt.textContent = label; source.append(opt);
+          }
+          source.value = existing ? existing.Source : 'bazarr';
+          const automatic = document.createElement('input');
+          automatic.type = 'checkbox';
+          automatic.checked = existing ? existing.Automatic !== false : true;
+          const autoLabel = document.createElement('label');
+          autoLabel.textContent = ' Automático ';
+          autoLabel.append(automatic);
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = existing ? 'Actualizar preferencias' : 'Seguir título';
+          button.addEventListener('click', async () => {
+            try {
+              await saveConfig(config => {
+                const list = Array.isArray(config.TrackedItems) ? config.TrackedItems : [];
+                config.TrackedItems = list.filter(x => !(x.Service === service && Number(x.Id) === id));
+                config.TrackedItems.push({Service:service,Id:id,Language:language.value,Source:source.value,Automatic:automatic.checked});
+              });
+              button.textContent = 'Actualizar preferencias';
+              message('Preferencias guardadas: ' + item.title + '. Aún no se ha activado ninguna descarga.');
+            } catch (_) { message('Error al guardar el título.'); }
+          });
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.textContent = 'Dejar de seguir';
+          remove.addEventListener('click', async () => {
+            try {
+              await saveConfig(config => {
+                config.TrackedItems = (config.TrackedItems || []).filter(x => !(x.Service === service && Number(x.Id) === id));
+              });
+              button.textContent = 'Seguir título';
+              message('Título eliminado del seguimiento.');
+            } catch (_) { message('Error al eliminar el título.'); }
+          });
+          row.append(title,language,source,autoLabel,button,remove);
+          area.append(row);
+        }
+        message('Catálogo cargado desde ' + service + '.');
+      } catch (e) {
+        message(errorText(e, 'No se pudo consultar el catálogo. Guarda y prueba primero su conexión.'));
+      }
+    }
+    q('#msbLoadShows').addEventListener('click', () => loadLibrary('sonarr'));
+    q('#msbLoadMovies').addEventListener('click', () => loadLibrary('radarr'));
+    root.addEventListener('pageshow', loadConfig);
+  }());
   </script>
 </div></body></html>
