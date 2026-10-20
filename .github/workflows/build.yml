@@ -73,7 +73,7 @@ jobs:
           ZIP=dist/Moonfin.SubtitleBridge_0.8.0.0_jf12.2.zip
           test -s "$ZIP"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" "$ZIP" --target "$GITHUB_SHA" --title "$TAG - Jellyfin 12.2 experimental" --prerelease --notes "Nueva función Procesar un episodio desde Jellyfin, con confirmación, selección única de Bazarr y equivalencias de Sonarr a Disney+."
+            gh release create "$TAG" "$ZIP" --target "$GITHUB_SHA" --title "$TAG - Jellyfin 12.2 experimental" --prerelease --notes "Nueva función Procesar un episodio desde Jellyfin y filtro instantáneo de series de Sonarr y películas de Radarr."
           else
             gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$(basename "$ZIP")"
             mkdir -p dist/released
