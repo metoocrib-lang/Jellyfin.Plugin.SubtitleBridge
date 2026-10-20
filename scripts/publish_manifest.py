@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 GUID = "b8e43169-c5f4-41d3-a9a0-8f4b9f85d792"
-VERSION = "0.5.0.0"
+VERSION = "0.6.0.0"
 ABI = "12.2.0.0"
 
 
@@ -20,7 +20,7 @@ def publish(manifest: Path, archive: Path, repo: str, tag: str):
     checksum = hashlib.md5(archive.read_bytes()).hexdigest()
     versions = [{
         "version": VERSION,
-        "changelog": "Consultar episodios sin subtítulos y solicitar una búsqueda individual a Bazarr desde Jellyfin.",
+        "changelog": "Panel de cuentas y URLs de streaming; activación por episodio nuevo en Jellyfin y cola experimental Disney+ en contenedor privado.",
         "targetAbi": ABI,
         "sourceUrl": f"https://github.com/{repo}/releases/download/{tag}/{archive.name}",
         "checksum": checksum,

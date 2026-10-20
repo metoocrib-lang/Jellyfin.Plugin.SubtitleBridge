@@ -33,3 +33,9 @@
 ```sh
 python -m unittest discover -s extractor/tests -v
 ```
+
+## Agente residente controlado por Jellyfin (v0.6)
+
+Además de la prueba manual de un episodio descrita arriba, el proyecto incluye `compose.agent.yml`: servidor autenticado con cola limitada y navegador privado. Jellyfin programa las revisiones, consulta Bazarr y envía los episodios faltantes. El agente intenta encontrar el enlace de reproducción por número de temporada/capítulo; no usa contraseñas del usuario ni elude DRM. Usa `/v1/status`, `/v1/login` y `/v1/scan` con el encabezado secreto `X-Bridge-Key`.
+
+Consulta las instrucciones específicas en [ZIMABOARD.md](ZIMABOARD.md). Los otros cuatro proveedores aún no tienen extracción real. Las páginas de catálogo pueden cambiar y es posible que se necesite ajustar el selector después de una prueba real.

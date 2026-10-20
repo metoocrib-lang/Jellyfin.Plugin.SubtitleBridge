@@ -53,13 +53,13 @@
     <div id="msbMessage" role="status" aria-live="polite"></div>
     <hr>
     <h3>Biblioteca y preferencias</h3>
-    <p>Guarda primero una serie con la fuente Proveedores Bazarr. Después consulta los capítulos pendientes y solicita una búsqueda individual. La extracción de Disney+ sigue pendiente.</p>
+    <p>Selecciona la plataforma de streaming para cada serie, guarda la URL pública de su página en esa plataforma y activa Automático. La tarea diaria de Jellyfin consultará Bazarr y solicitará extracción al agente local.</p>
     <button is="emby-button" class="raised" type="button" id="msbLoadShows">Cargar series de Sonarr</button>
     <button is="emby-button" class="raised" type="button" id="msbLoadMovies">Cargar películas de Radarr</button>
     <div id="msbLibrary"></div>
     <hr>
     <details>
-      <summary>Agente opcional de extracción de Disney+ (experimental)</summary>
+      <summary>Motor de streaming y cuentas (agente Docker en ZimaBoard)</summary>
       <form id="msbAgentForm">
         <div class="inputContainer"><label class="inputLabel" for="msbUrl">URL interna del agente</label>
           <input is="emby-input" id="msbUrl" type="url" placeholder="http://moonfin-subtitle-bridge:8787"/></div>
@@ -68,7 +68,16 @@
         <button is="emby-button" type="submit" class="raised">Guardar agente</button>
         <button is="emby-button" type="button" id="msbAgentHealth">Probar agente</button>
       </form>
-      <p>La automatización del navegador aún necesita trabajo y no se activa con las conexiones directas a Sonarr/Radarr/Bazarr.</p>
+      <p>El plugin nunca solicita contraseñas de Netflix/Disney+. Inicias sesión directamente en el navegador local; se guarda su perfil en un volumen privado Docker. Configura la red privada y accede al escritorio mediante túnel SSH a localhost:6080.</p>
+      <h3>Cuentas de streaming</h3>
+      <button type="button" is="emby-button" class="raised" id="msbStartDisney">Iniciar sesión en Disney+ (navegador local)</button>
+      <button type="button" is="emby-button" class="raised" id="msbStreamingStatus">Consultar estado y trabajos</button>
+      <pre id="msbStreamingOutput" style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite"></pre>
+      <h3>Detección de nuevos episodios</h3>
+      <p>La búsqueda se inicia cuando Jellyfin agrega un episodio físico nuevo a su biblioteca. El plugin espera unos segundos para completar metadatos, comprueba la coincidencia TVDB entre Jellyfin y Sonarr y verifica el idioma pendiente en Bazarr. No hace revisiones diarias. Si Jellyfin no dispone del identificador TVDB, no intentará asociar el episodio.</p>
+      <p>También puedes revisar manualmente las series seleccionadas para recuperar episodios agregados mientras Jellyfin estuvo apagado.</p>
+      <button type="button" is="emby-button" class="raised" id="msbStreamingScan">Revisar ahora (manual)</button>
+      <p><strong>Experimental:</strong> Disney+ intentará identificar episodios por enlaces etiquetados inequívocamente; si el catálogo no expone esos datos, aparecerá “episodio_no_identificado” y no se descargará nada. Netflix, Prime, Max y Apple TV+ aún no tienen extractores operativos.</p>
     </details>
   </div></div>
   <script>
@@ -208,10 +217,19 @@
           }
           language.value = existing ? existing.Language : 'es';
           const source = document.createElement('select');
-          for (const [key, label] of [['bazarr','Proveedores Bazarr'],['disney','Disney+ (experimental)']]) {
+          for (const [key, label] of [['bazarr','Proveedores Bazarr'],['disney','Disney+ (experimental)'],['netflix','Netflix (pendiente)'],['prime','Prime Video (pendiente)'],['max','Max (pendiente)'],['apple','Apple TV+ (pendiente)']]) {
             const opt = document.createElement('option'); opt.value = key; opt.textContent = label; source.append(opt);
           }
           source.value = existing ? existing.Source : 'bazarr';
+          const streamingUrl = document.createElement('input');
+          streamingUrl.setAttribute('is', 'emby-input');
+          streamingUrl.type = 'url';
+          streamingUrl.placeholder = 'URL de la serie en la plataforma (https://www.disneyplus.com/series/...)';
+          streamingUrl.value = existing ? (existing.StreamingUrl || '') : '';
+          streamingUrl.style.width = 'min(100%, 680px)';
+          const streamingLabel = document.createElement('label');
+          streamingLabel.textContent = 'Enlace de streaming de la serie ';
+          streamingLabel.append(streamingUrl);
           const automatic = document.createElement('input');
           automatic.type = 'checkbox';
           automatic.checked = existing ? existing.Automatic !== false : true;
@@ -226,10 +244,10 @@
               await saveConfig(config => {
                 const list = Array.isArray(config.TrackedItems) ? config.TrackedItems : [];
                 config.TrackedItems = list.filter(x => !(x.Service === service && Number(x.Id) === id));
-                config.TrackedItems.push({Service:service,Id:id,Language:language.value,Source:source.value,Automatic:automatic.checked});
+                config.TrackedItems.push({Service:service,Id:id,Language:language.value,Source:source.value,Automatic:automatic.checked,StreamingUrl:streamingUrl.value.trim()});
               });
               button.textContent = 'Actualizar preferencias';
-              message('Preferencias guardadas: ' + item.title + '. Aún no se ha activado ninguna descarga.');
+              message('Preferencias guardadas: ' + item.title + '. La revisión diaria se aplicará cuando conectes el agente.');
             } catch (_) { message('Error al guardar el título.'); }
           });
           const remove = document.createElement('button');
@@ -244,7 +262,7 @@
               message('Título eliminado del seguimiento.');
             } catch (_) { message('Error al eliminar el título.'); }
           });
-          row.append(title,language,source,autoLabel,button,remove);
+          row.append(title,language,source,streamingLabel,autoLabel,button,remove);
           if (service === 'sonarr') {
             const pendingButton = document.createElement('button');
             pendingButton.type = 'button';
@@ -304,6 +322,25 @@
         message(errorText(e, 'No se pudo consultar el catálogo. Guarda y prueba primero su conexión.'));
       }
     }
+    q('#msbStartDisney').addEventListener('click', async () => {
+      try {
+        const result = await apiPost('streaming/login', {provider:'disney'});
+        message(result.message || 'Navegador abierto. Accede por túnel SSH a noVNC en la ZimaBoard.');
+      } catch (err) { message(errorText(err, 'No se pudo iniciar el navegador; verifica URL y token del agente.')); }
+    });
+    q('#msbStreamingStatus').addEventListener('click', async () => {
+      try {
+        const result = await api('streaming/status');
+        q('#msbStreamingOutput').textContent = JSON.stringify(result, null, 2);
+        message('Estado actualizado.');
+      } catch (err) { message(errorText(err, 'Agente de streaming no disponible.')); }
+    });
+    q('#msbStreamingScan').addEventListener('click', async () => {
+      try {
+        const result = await apiPost('streaming/scan', {});
+        message(result.message || 'Revisión enviada al agente. Consulta su estado para resultados.');
+      } catch (err) { message(errorText(err, 'No se pudo iniciar la revisión. Revisa la conexión y las URLs.')); }
+    });
     q('#msbLoadShows').addEventListener('click', () => loadLibrary('sonarr'));
     q('#msbLoadMovies').addEventListener('click', () => loadLibrary('radarr'));
     root.addEventListener('pageshow', loadConfig);
