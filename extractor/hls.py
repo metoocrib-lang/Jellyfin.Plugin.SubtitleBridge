@@ -31,6 +31,23 @@ def allowed_disney_url(url: str, *, episode: bool = False) -> bool:
         return False
 
 
+def allowed_disney_series_url(url: str) -> bool:
+    """Permit only Disney+ series detail pages, including localized browse/entity URLs."""
+    if not allowed_disney_url(url, episode=True):
+        return False
+    parts = urlsplit(url)
+    if parts.query or parts.fragment:
+        return False
+    # Disney+ currently uses /es-419/browse/entity-UUID for series in Latin America.
+    # Keep the legacy /series/ form for installations that still serve it.
+    return bool(re.fullmatch(
+        r"/(?:[a-z]{2}(?:-[a-z0-9]{2,4})/)?(?:browse/entity-"
+        r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}|"
+        r"series/[a-z0-9][a-z0-9._~%/-]{0,255})/?",
+        parts.path, flags=re.IGNORECASE,
+    ))
+
+
 def attributes(raw: str) -> dict[str, str]:
     # HLS attribute list with quoted comma-containing values.
     return {
