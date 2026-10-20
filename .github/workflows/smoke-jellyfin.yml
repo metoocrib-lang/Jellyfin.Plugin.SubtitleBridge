@@ -62,6 +62,12 @@ jobs:
             echo "Expected admin-only Bazarr route (401/403), got $code"
             exit 1
           fi
+          echo "Checking episode listener service was registered and started..."
+          if ! docker logs smoke-jellyfin 2>&1 | grep -q 'escuchando nuevos episodios'; then
+            echo "Episode event listener did not start"
+            docker logs smoke-jellyfin --tail 120
+            exit 1
+          fi
       - name: Logs on failure
         if: failure()
         run: docker logs smoke-jellyfin --tail 250 || true
