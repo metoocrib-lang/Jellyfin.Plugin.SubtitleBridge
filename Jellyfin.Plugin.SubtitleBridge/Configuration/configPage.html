@@ -53,7 +53,7 @@
     <div id="msbMessage" role="status" aria-live="polite"></div>
     <hr>
     <h3>Biblioteca y preferencias</h3>
-    <p>Estas preferencias se conservan dentro de Jellyfin. La extracción desatendida de Disney+ requerirá conectar un agente de navegador más adelante.</p>
+    <p>Guarda primero una serie con la fuente Proveedores Bazarr. Después consulta los capítulos pendientes y solicita una búsqueda individual. La extracción de Disney+ sigue pendiente.</p>
     <button is="emby-button" class="raised" type="button" id="msbLoadShows">Cargar series de Sonarr</button>
     <button is="emby-button" class="raised" type="button" id="msbLoadMovies">Cargar películas de Radarr</button>
     <div id="msbLibrary"></div>
@@ -86,6 +86,15 @@
       return ApiClient.ajax({
         type: 'GET',
         url: ApiClient.getUrl('MoonfinSubtitleBridge/' + path),
+        dataType: 'json'
+      });
+    }
+    function apiPost(path, body) {
+      return ApiClient.ajax({
+        type: 'POST',
+        url: ApiClient.getUrl('MoonfinSubtitleBridge/' + path),
+        contentType: 'application/json',
+        data: JSON.stringify(body),
         dataType: 'json'
       });
     }
@@ -236,6 +245,58 @@
             } catch (_) { message('Error al eliminar el título.'); }
           });
           row.append(title,language,source,autoLabel,button,remove);
+          if (service === 'sonarr') {
+            const pendingButton = document.createElement('button');
+            pendingButton.type = 'button';
+            pendingButton.textContent = 'Ver episodios pendientes en Bazarr';
+            const pendingArea = document.createElement('div');
+            pendingArea.className = 'msb-episode-results';
+            pendingButton.addEventListener('click', async () => {
+              if (source.value !== 'bazarr') {
+                message('Selecciona Proveedores Bazarr y guarda la serie antes de consultar pendientes.');
+                return;
+              }
+              pendingButton.disabled = true;
+              pendingArea.replaceChildren();
+              message('Consultando los episodios pendientes de ' + item.title + '…');
+              try {
+                const result = await api('bazarr/episodes?seriesId=' + encodeURIComponent(id));
+                const episodes = result.episodes || [];
+                const label = document.createElement('p');
+                label.textContent = episodes.length
+                  ? episodes.length + ' episodios pendientes en ' + result.language + ' (máximo 200).'
+                  : 'Bazarr no reporta episodios pendientes para ese idioma. Comprueba su perfil de idiomas.';
+                pendingArea.append(label);
+                for (const ep of episodes) {
+                  const line = document.createElement('div');
+                  const name = document.createElement('span');
+                  name.textContent = 'T' + ep.season + ' E' + ep.episode + ' ' + (ep.title || '') + ' ';
+                  const search = document.createElement('button');
+                  search.type = 'button';
+                  search.textContent = 'Buscar subtítulo en Bazarr';
+                  search.addEventListener('click', async () => {
+                    search.disabled = true;
+                    try {
+                      await apiPost('bazarr/search', {seriesId:id,episodeId:ep.id});
+                      search.textContent = 'Búsqueda solicitada';
+                      message('Bazarr recibió la solicitud de búsqueda. Aún no se ha confirmado una descarga.');
+                    } catch (e) {
+                      search.disabled = false;
+                      message(errorText(e, 'No se pudo solicitar la búsqueda a Bazarr.'));
+                    }
+                  });
+                  line.append(name, search);
+                  pendingArea.append(line);
+                }
+                message('Episodios pendientes consultados. Nada se descarga hasta que pulses Buscar.');
+              } catch (e) {
+                message(errorText(e, 'No se pudieron consultar pendientes. Guarda la serie con Proveedores Bazarr.'));
+              } finally {
+                pendingButton.disabled = false;
+              }
+            });
+            row.append(pendingButton, pendingArea);
+          }
           area.append(row);
         }
         message('Catálogo cargado desde ' + service + '.');
