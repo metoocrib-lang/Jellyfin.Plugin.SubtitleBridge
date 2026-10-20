@@ -43,7 +43,7 @@ En **Moonfin Subtitle Bridge v0.6**:
 
 1. En “Motor de streaming y cuentas”, URL `http://moonfin-streaming-agent:8787` y token igual que `BRIDGE_API_TOKEN`. Guarda.
 2. Abre “Cargar series de Sonarr”, elige una serie y la fuente `Disney+`.
-3. Especifica la **URL de la página de la serie** en Disney+, idioma (por ejemplo `es`) y marca Automático. Guarda.
+3. Especifica la **URL de la página de la serie** en Disney+ (también se admite `https://www.disneyplus.com/es-419/browse/entity-UUID`), idioma (por ejemplo `es`) y marca Automático. Guarda.
 4. En “Cuentas de streaming”, pulsa “Iniciar sesión en Disney+”.
 
 ## 4. Iniciar sesión en Disney+ sin compartir credenciales
@@ -66,6 +66,8 @@ Cuando Jellyfin registre un episodio nuevo, el plugin comprobará automáticamen
 - `pista_cifrada_no_admitida`: no se intentará descifrar.
 - `sin_subtitulo_accesible_o_sesion`: revisar autenticación y disponibilidad de pistas.
 - `conector_pendiente`: Netflix, Prime Video, Max y Apple TV+ todavía no tienen adaptador.
+
+Para páginas que muestran episodios como botones sin enlaces de reproducción explícitos, el selector conservador aún puede responder `episodio_no_identificado`. Se admiten rótulos `T1:E1` y `S1:E1` cuando los enlaces directos están disponibles. No se identifica un episodio por posición en la página.
 
 El agente usa una espera de 24 horas entre intentos sobre el mismo episodio/idioma y no ejecuta múltiples navegadores a la vez. Si la sesión caduca, vuelve a pulsar “Iniciar sesión” para renovarla.
 
