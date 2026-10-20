@@ -23,8 +23,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p smoke/config/plugins/MoonfinSubtitleBridge_0.4.1.0
-          cp Jellyfin.Plugin.SubtitleBridge/bin/Release/net10.0/Jellyfin.Plugin.SubtitleBridge.dll smoke/config/plugins/MoonfinSubtitleBridge_0.4.1.0/
+          mkdir -p smoke/config/plugins/MoonfinSubtitleBridge_0.5.0.0
+          cp Jellyfin.Plugin.SubtitleBridge/bin/Release/net10.0/Jellyfin.Plugin.SubtitleBridge.dll smoke/config/plugins/MoonfinSubtitleBridge_0.5.0.0/
           chmod -R a+rwX smoke
           docker run -d --name smoke-jellyfin -p 127.0.0.1:18096:8096 -v "$PWD/smoke/config:/config" jellyfin/jellyfin:12.2
           ok=0
@@ -54,6 +54,12 @@ jobs:
           docker logs smoke-jellyfin 2>&1 | grep -Ei 'SubtitleBridge|Moonfin|plugin' | tail -40 || true
           if [ "$code" != "401" ] && [ "$code" != "403" ]; then
             echo "Expected admin-only plugin route (401/403), not $code"
+            exit 1
+          fi
+          code=$(curl --max-time 5 -sS -o /tmp/moonfin-bazarr-probe.txt -w '%{http_code}' 'http://127.0.0.1:18096/MoonfinSubtitleBridge/bazarr/episodes?seriesId=1' || true)
+          echo "Unauthenticated Bazarr controller HTTP code: $code"
+          if [ "$code" != "401" ] && [ "$code" != "403" ]; then
+            echo "Expected admin-only Bazarr route (401/403), got $code"
             exit 1
           fi
       - name: Logs on failure
