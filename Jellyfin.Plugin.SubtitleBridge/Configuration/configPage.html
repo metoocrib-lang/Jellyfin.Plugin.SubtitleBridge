@@ -18,7 +18,7 @@
           <label class="inputLabel" for="msbBazarrKey">API key de Bazarr</label>
           <input id="msbBazarrKey" is="emby-input" type="password" placeholder="Dejar vacío para conservar la clave guardada" autocomplete="new-password"/>
         </div>
-        <button is="emby-button" class="raised" type="button" data-test-service="bazarr">Probar Bazarr</button>
+        <button is="emby-button" class="raised" type="button" data-test-service="bazarr">Guardar y probar Bazarr</button>
         <span id="msbBazarrStatus" role="status"></span>
       </div>
       <div class="verticalSection">
@@ -31,7 +31,7 @@
           <label class="inputLabel" for="msbSonarrKey">API key de Sonarr</label>
           <input id="msbSonarrKey" is="emby-input" type="password" placeholder="Dejar vacío para conservar la clave guardada" autocomplete="new-password"/>
         </div>
-        <button is="emby-button" class="raised" type="button" data-test-service="sonarr">Probar Sonarr</button>
+        <button is="emby-button" class="raised" type="button" data-test-service="sonarr">Guardar y probar Sonarr</button>
         <span id="msbSonarrStatus" role="status"></span>
       </div>
       <div class="verticalSection">
@@ -44,10 +44,11 @@
           <label class="inputLabel" for="msbRadarrKey">API key de Radarr</label>
           <input id="msbRadarrKey" is="emby-input" type="password" placeholder="Dejar vacío para conservar la clave guardada" autocomplete="new-password"/>
         </div>
-        <button is="emby-button" class="raised" type="button" data-test-service="radarr">Probar Radarr</button>
+        <button is="emby-button" class="raised" type="button" data-test-service="radarr">Guardar y probar Radarr</button>
         <span id="msbRadarrStatus" role="status"></span>
       </div>
-      <button is="emby-button" type="submit" class="raised button-submit">Guardar conexiones</button>
+      <p>Puedes usar "Guardar y probar" directamente en cada servicio; guarda su URL y clave antes de hacer la comprobación.</p>
+      <button is="emby-button" type="submit" class="raised button-submit">Guardar todas las conexiones</button>
     </form>
     <div id="msbMessage" role="status" aria-live="polite"></div>
     <hr>
@@ -120,16 +121,39 @@
         message('Conexiones guardadas. Ya puedes probar cada servicio.');
       } catch (_) { message('No fue posible guardar las conexiones.'); }
     });
+    // Test from the values shown in this service's fields. Previously testing
+    // before clicking "Guardar conexiones" used stale/empty configuration.
     for (const btn of root.querySelectorAll('[data-test-service]')) {
       btn.addEventListener('click', async () => {
+        if (btn.disabled) return;
         const service = btn.getAttribute('data-test-service');
         const serviceName = service[0].toUpperCase() + service.slice(1);
         const target = q('#msb' + serviceName + 'Status');
-        target.textContent = ' Comprobando…';
+        const urlInput = q('#msb' + serviceName + 'Url');
+        const keyInput = q('#msb' + serviceName + 'Key');
+        const url = urlInput.value.trim();
+        const newKey = keyInput.value.trim();
+        if (!url || !urlInput.checkValidity()) {
+          target.textContent = ' Introduce una URL HTTP(S) válida.';
+          return;
+        }
+        btn.disabled = true;
+        target.textContent = ' Guardando y comprobando…';
         try {
+          // Only this service is updated; unsaved edits for other services
+          // are left untouched and existing keys survive blank password fields.
+          await saveConfig(cfg => {
+            cfg[serviceName + 'Url'] = url;
+            if (newKey) cfg[serviceName + 'ApiKey'] = newKey;
+          });
+          keyInput.value = '';
           const result = await api('connections/test?service=' + encodeURIComponent(service));
           target.textContent = ' ' + (result.version ? 'Conectado · versión ' + result.version : 'Conectado correctamente');
-        } catch (e) { target.textContent = ' ' + errorText(e, 'No se pudo conectar. Revisa URL, API key y red Docker.'); }
+        } catch (e) {
+          target.textContent = ' ' + errorText(e, 'No se pudo conectar. Revisa URL, API key y red Docker.');
+        } finally {
+          btn.disabled = false;
+        }
       });
     }
     q('#msbAgentForm').addEventListener('submit', async e => {
