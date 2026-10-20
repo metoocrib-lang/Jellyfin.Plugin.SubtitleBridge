@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Jellyfin.Plugin.SubtitleBridge/EpisodeMapper.cs" Link="EpisodeMapper.cs" />
+    <Compile Include="../../Jellyfin.Plugin.SubtitleBridge/SingleEpisodePlanner.cs" Link="SingleEpisodePlanner.cs" />
   </ItemGroup>
 </Project>
