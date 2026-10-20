@@ -34,6 +34,22 @@ public static class StreamingScanDispatcher
         if (tracked.Count == 0)
             return new ScanSummary(0, 0, "No hay series de streaming habilitadas con URL.");
 
+        // Parse once per followed series. Invalid or ambiguous rules must abort
+        // rather than silently attach subtitles to a different episode.
+        var mappings = new Dictionary<int, IReadOnlyList<EpisodeMapper.Rule>>();
+        foreach (var item in tracked)
+        {
+            try
+            {
+                mappings.Add(item.Key, EpisodeMapper.Parse(item.Value.EpisodeMapping));
+            }
+            catch (FormatException)
+            {
+                throw new InvalidOperationException(
+                    "Mapeo de episodios inválido. Revisa las equivalencias de la serie de Sonarr.");
+            }
+        }
+
         var wanted = new List<Dictionary<string, object>>();
         var count = 0;
         // Bazarr wanted list is paginated, limit work per run to prevent overload.
@@ -80,14 +96,19 @@ public static class StreamingScanDispatcher
                         && (!x.TryGetProperty("hi", out var hi) || hi.ValueKind != JsonValueKind.True)))
                     continue;
 
-                // Only send known IDs, season/episode, source and URL to the agent.
+                // Sonarr/Bazarr identifiers remain unchanged. Only these two
+                // numbers are translated for episode discovery at the provider.
+                if (!EpisodeMapper.TryMap(mappings[seriesId], season, episode,
+                    out var providerSeason, out var providerEpisode))
+                    continue;
+
                 wanted.Add(new Dictionary<string, object> {
                     ["provider"] = follow.Source,
                     ["series_url"] = follow.StreamingUrl,
                     ["series_id"] = seriesId,
                     ["episode_id"] = episodeId,
-                    ["season"] = season,
-                    ["episode"] = episode,
+                    ["season"] = providerSeason,
+                    ["episode"] = providerEpisode,
                     ["language"] = follow.Language
                 });
             }

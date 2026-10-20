@@ -9,7 +9,7 @@ Plugin nativo para administrar series, idiomas y fuentes de subtítulos desde el
 https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
 ```
 
-En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.6.0.0 (Jellyfin 12.2, .NET 10).
+En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.7.0.0 (Jellyfin 12.2, .NET 10).
 
 ## Configurar URLs de Bazarr / Sonarr / Radarr
 
@@ -59,6 +59,19 @@ Para las cuentas de streaming, pulsa “Iniciar sesión en Disney+” y autentí
 **Límite actual:** Solo Disney+ cuenta con un extractor experimental. El agente intenta identificar el episodio desde enlaces de reproducción claramente marcados S01E02 o equivalentes en la página de la serie; si la web no muestra esos datos, deja constancia del episodio sin identificar. No se garantiza extracción en streaming comercial ni soporte de DRM. Netflix, Prime Video, Max y Apple TV+ aparecen como conectores pendientes sin falsa promesa de descarga.
 
 Guía específica de ZimaBoard 2 y Docker: [extractor/ZIMABOARD.md](extractor/ZIMABOARD.md).
+
+### Equivalencias entre numeraciones (v0.7, experimental)
+
+Para series como **Bleach: Thousand-Year Blood War**, Sonarr/Jellyfin pueden usar una sola temporada 17 mientras Disney+ muestra cuatro temporadas separadas. El campo **Equivalencias Sonarr → streaming** de la serie admite una regla por línea:
+
+```text
+17x1-13=1x1
+17x14-26=2x1
+17x27-40=3x1
+17x41-50=4x1
+```
+
+Ejemplo: `17x49=4x9`. Las reglas son por serie, pueden representar rangos o episodios individuales, no admiten superposiciones ni un destino compartido. **Campo vacío**: numeración idéntica. **Campo con reglas**: los episodios sin equivalencia se omiten para evitar asignaciones erróneas. Los ID de serie y episodio de Sonarr/Bazarr no cambian: solo se traducen temporada y episodio enviados al agente para localizar la reproducción. Las equivalencias se aplican tanto a revisiones manuales como a episodios nuevos. Verifica los límites de temporadas cuando el catálogo cambie.
 
 ### Activación basada en eventos
 
