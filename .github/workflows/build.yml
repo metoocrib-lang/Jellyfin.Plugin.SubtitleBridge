@@ -26,6 +26,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Validate Jellyfin admin UI JavaScript
         run: python scripts/check_config_js.py
+      - name: Test live Sonarr and Radarr search filter
+        run: node scripts/test_catalog_filter.cjs
       - name: Check episode mapping rules
         run: dotnet run --project tests/EpisodeMapping.Tests/EpisodeMapping.Tests.csproj
       - name: Restore
