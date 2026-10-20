@@ -44,6 +44,36 @@ public sealed class StreamingController : ControllerBase
         }
     }
 
+    [HttpPost("episode")]
+    public async Task<IActionResult> SingleEpisode([FromBody] SingleEpisodeRequest? data, CancellationToken ct)
+    {
+        if (data is null || data.SeriesId < 1 || data.Season < 0 || data.Season > 100
+            || data.Episode < 1 || data.Episode > 999)
+            return BadRequest(new { error = "Selecciona una serie, temporada y episodio válidos." });
+        try
+        {
+            return Ok(await StreamingScanDispatcher.ScanSingleAsync(
+                data.SeriesId, data.Season, data.Episode, ct).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (ArgumentException)
+        {
+            return BadRequest(new { error = "Identificadores de episodio inválidos." });
+        }
+        catch (FormatException)
+        {
+            return Conflict(new { error = "Revisa el formato y la ausencia de conflictos en las equivalencias." });
+        }
+        catch (InvalidOperationException)
+        {
+            return Conflict(new { error = "No se pudo procesar el episodio. Revisa la serie, las equivalencias, Bazarr y el agente." });
+        }
+        catch (Exception error) when (error is HttpRequestException or JsonException or TaskCanceledException)
+        {
+            return StatusCode(502, new { error = "Error consultando Bazarr o el agente. Revisa conexiones y estado." });
+        }
+    }
+
     private async Task<IActionResult> Relay(HttpMethod method, string path, string? body, CancellationToken ct)
     {
         var cfg = Plugin.Instance?.Configuration;
@@ -77,4 +107,11 @@ public sealed class StreamingController : ControllerBase
 public sealed class LoginRequest
 {
     public string Provider { get; set; } = string.Empty;
+}
+
+public sealed class SingleEpisodeRequest
+{
+    public int SeriesId { get; set; }
+    public int Season { get; set; }
+    public int Episode { get; set; }
 }
