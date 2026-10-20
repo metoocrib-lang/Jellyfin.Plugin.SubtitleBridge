@@ -9,7 +9,7 @@ Plugin nativo para administrar series, idiomas y fuentes de subtítulos desde el
 https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
 ```
 
-En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.5.0.0 (Jellyfin 12.2, .NET 10).
+En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.6.0.0 (Jellyfin 12.2, .NET 10).
 
 ## Configurar URLs de Bazarr / Sonarr / Radarr
 
@@ -47,3 +47,15 @@ Nunca publiques API keys, contraseñas, cookies ni perfiles de navegador en GitH
 ## Extractores desde plataformas de streaming (experimental)
 
 El primer prototipo para Disney+ se mantiene en [`extractor/`](extractor/README.md): navegador local con sesión iniciada por el usuario, captura HLS/WebVTT accesible, SRT e importación opcional en Bazarr. La prueba inicial requiere una URL de episodio; **no** sincroniza todavía temporadas automáticamente desde las series seguidas en Jellyfin. Netflix, Prime, Max y Apple TV+ son conectores pendientes. No se eluden DRM ni controles de acceso.
+
+## Centro de streaming y revisión diaria (experimental v0.6)
+
+El plugin permite elegir **plataforma + idioma + URL de serie + Automático** para cada serie de Sonarr. Jellyfin registra su tarea “Moonfin Subtitle Bridge: revisar streaming” cada 24 horas; también se puede iniciar manualmente desde su configuración. El plugin consulta directamente `/api/episodes/wanted` en Bazarr y manda hasta 30 episodios faltantes al agente Docker autenticado.
+
+**El agente está aislado para que Chromium no se ejecute dentro de Jellyfin.** Se configura desde el plugin con la URL `http://moonfin-streaming-agent:8787` y el mismo token privado `BRIDGE_API_TOKEN` del contenedor. Las claves de Bazarr se transmiten al agente solo en cada trabajo, por la red privada Docker; nunca se escriben en sus archivos de estado. Protege igualmente la red y las copias del directorio de configuración de Jellyfin.
+
+Para las cuentas de streaming, pulsa “Iniciar sesión en Disney+” y autentícate directamente en el navegador mediante noVNC/túnel SSH; **no introduzcas contraseñas en el plugin**. El plugin mostrará el estado declarado por el agente (perfil guardado NO significa autenticación verificada).
+
+**Límite actual:** Solo Disney+ cuenta con un extractor experimental. El agente intenta identificar el episodio desde enlaces de reproducción claramente marcados S01E02 o equivalentes en la página de la serie; si la web no muestra esos datos, deja constancia del episodio sin identificar. No se garantiza extracción en streaming comercial ni soporte de DRM. Netflix, Prime Video, Max y Apple TV+ aparecen como conectores pendientes sin falsa promesa de descarga.
+
+Guía específica de ZimaBoard 2 y Docker: [extractor/ZIMABOARD.md](extractor/ZIMABOARD.md).

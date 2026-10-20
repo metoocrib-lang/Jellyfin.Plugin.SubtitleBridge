@@ -1,0 +1,33 @@
+# docker network create moonfin-subtitle-net (once)
+# docker network connect moonfin-subtitle-net JELLYFIN_CONTAINER (once)
+# docker network connect moonfin-subtitle-net BAZARR_CONTAINER (if using Bazarr Docker hostname)
+# docker compose -f extractor/compose.agent.yml up -d --build
+services:
+  streaming-agent:
+    image: moonfin-streaming-agent:dev
+    build:
+      context: ..
+      dockerfile: extractor/Dockerfile
+    command: ["/workspace/extractor/entrypoint-agent.sh"]
+    container_name: moonfin-streaming-agent
+    restart: unless-stopped
+    env_file:
+      - .env
+    init: true
+    shm_size: "1gb"
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:6080:6080"
+    volumes:
+      - streaming_profile:/data/browser
+      - streaming_state:/data/state
+    networks:
+      - bridge
+networks:
+  bridge:
+    external: true
+    name: moonfin-subtitle-net
+volumes:
+  streaming_profile:
+  streaming_state:
