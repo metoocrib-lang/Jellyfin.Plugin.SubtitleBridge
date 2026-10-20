@@ -1,0 +1,35 @@
+name: Build Jellyfin 12.2 plugin
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore Jellyfin.Plugin.SubtitleBridge/Jellyfin.Plugin.SubtitleBridge.csproj
+      - name: Build
+        run: dotnet build Jellyfin.Plugin.SubtitleBridge/Jellyfin.Plugin.SubtitleBridge.csproj --no-restore --configuration Release
+      - name: Package experimental DLL (CI artifact only)
+        if: success()
+        shell: bash
+        run: |
+          mkdir -p dist/package
+          cp Jellyfin.Plugin.SubtitleBridge/bin/Release/net10.0/Jellyfin.Plugin.SubtitleBridge.dll dist/package/
+          cd dist/package
+          zip -j ../Moonfin.SubtitleBridge-0.3.0.0-jf12.2-experimental.zip Jellyfin.Plugin.SubtitleBridge.dll
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: moonfin-subtitle-bridge-jf12.2-experimental
+          path: dist/*.zip

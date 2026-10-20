@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Moonfin Subtitle Bridge</title></head>
+<body>
+<div id="SubtitleBridgePage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+  <div data-role="content"><div class="content-primary">
+    <h2>Moonfin Subtitle Bridge</h2>
+    <p>Jellyfin 12.2 · Configura el agente Docker en tu red local y selecciona series.</p>
+    <form id="msbSettings">
+      <div class="inputContainer"><label class="inputLabel" for="msbUrl">URL interna del agente</label>
+        <input is="emby-input" id="msbUrl" type="url" required placeholder="http://moonfin-subtitle-bridge:8787"></div>
+      <div class="inputContainer"><label class="inputLabel" for="msbToken">Token local del agente</label>
+        <input is="emby-input" id="msbToken" type="password" autocomplete="off" required></div>
+      <button is="emby-button" class="raised button-submit" type="submit">Guardar conexión</button>
+    </form>
+    <p><button is="emby-button" class="raised" id="msbHealth">Probar conexión</button>
+      <button is="emby-button" class="raised" id="msbRefresh">Actualizar series</button></p>
+    <div id="msbMessage" role="status" aria-live="polite"></div>
+    <div id="msbShows"></div>
+    <hr>
+    <button is="emby-button" class="raised" id="msbScan">Ejecutar búsqueda/importación</button>
+    <p>Disney+ está en fase experimental: el agente requiere una URL por episodio, autenticación directa en su navegador y un subtítulo accesible.</p>
+  </div></div>
+  <script>
+    (function () {
+      const root = document.querySelector('#SubtitleBridgePage');
+      const guid = 'b8e43169-c5f4-41d3-a9a0-8f4b9f85d792';
+      const q = s => root.querySelector(s);
+      const msg = s => { q('#msbMessage').textContent = s; };
+      function api(path, body) {
+        return ApiClient.ajax({
+          type: body === undefined ? 'GET' : 'POST',
+          url: ApiClient.getUrl('MoonfinSubtitleBridge/' + path),
+          contentType: 'application/json',
+          data: body === undefined ? undefined : JSON.stringify(body),
+          dataType: 'json'
+        });
+      }
+      async function loadConfig() {
+        const cfg = await ApiClient.getPluginConfiguration(guid);
+        q('#msbUrl').value = cfg.BridgeUrl || '';
+        q('#msbToken').value = cfg.BridgeToken || '';
+      }
+      q('#msbSettings').addEventListener('submit', async ev => {
+        ev.preventDefault();
+        try {
+          const cfg = await ApiClient.getPluginConfiguration(guid);
+          cfg.BridgeUrl = q('#msbUrl').value.trim();
+          cfg.BridgeToken = q('#msbToken').value.trim();
+          await ApiClient.updatePluginConfiguration(guid, cfg);
+          msg('Configuración guardada.');
+        } catch (err) { msg('Error guardando configuración.'); }
+      });
+      q('#msbHealth').addEventListener('click', async () => {
+        try { const r = await api('health'); msg('Conexión: ' + (r.status || 'correcta')); }
+        catch (_) { msg('Sin conexión. Comprueba la red Docker y el token.'); }
+      });
+      async function renderShows() {
+        msg('Consultando Jellyfin y Bazarr...');
+        try {
+          const res = await api('series');
+          const area = q('#msbShows'); area.replaceChildren();
+          const watches = res.watches || [];
+          const findWatch = id => Array.isArray(watches)
+            ? watches.find(w => String(w.jellyfin_id) === String(id))
+            : watches[id];
+          for (const show of res.series || []) {
+            if (!show.bazarr_id) continue;
+            const node = document.createElement('div');
+            node.className = 'verticalSection';
+            const h = document.createElement('h3'); h.textContent = show.title || 'Serie'; node.append(h);
+            const language = document.createElement('select'); language.setAttribute('is','emby-select');
+            for (const [v,t] of [['es','Español'],['en','Inglés'],['es-MX','Español (México)']]) {
+              const o = document.createElement('option'); o.value=v; o.textContent=t; language.append(o);
+            }
+            const source = document.createElement('select'); source.setAttribute('is','emby-select');
+            for (const [v,t] of [['disney','Disney+'],['bazarr','Proveedores Bazarr']]) {
+              const o=document.createElement('option');o.value=v;o.textContent=t;source.append(o);
+            }
+            const automatic = document.createElement('input'); automatic.type='checkbox'; automatic.checked=true;
+            const watch = findWatch(show.jellyfin_id);
+            if (watch) {
+              language.value=watch.lang||'es'; source.value=watch.source||'bazarr';
+              automatic.checked=watch.automatic===true;
+            }
+            const save = document.createElement('button'); save.type='button'; save.textContent='Guardar serie';
+            save.addEventListener('click', async () => {
+              try { await api('watch',{id:String(show.jellyfin_id),lang:language.value,source:source.value,automatic:automatic.checked}); msg('Serie guardada: '+show.title); }
+              catch (_) { msg('No se pudo guardar la serie.'); }
+            });
+            const remove=document.createElement('button');remove.type='button';remove.textContent='Dejar de seguir';
+            remove.addEventListener('click',async()=>{try{await api('remove',{id:String(show.jellyfin_id)});msg('Serie eliminada');}catch(_){msg('No se pudo eliminar');}});
+            const episodes=document.createElement('button');episodes.type='button';episodes.textContent='Ver episodios';
+            episodes.addEventListener('click',async()=>{
+              let box=node.querySelector('.msb-episodes');if(!box){box=document.createElement('div');box.className='msb-episodes';node.append(box);}
+              box.replaceChildren();
+              try {
+                const r=await api('episodes?id='+encodeURIComponent(show.jellyfin_id));
+                for(const ep of r.episodes||[]){
+                  const row=document.createElement('div');
+                  const caption=document.createElement('span');caption.textContent='T'+ep.season+' E'+ep.episode+' — '+(ep.title||'')+' ';
+                  const field=document.createElement('input');field.type='url';field.placeholder='https://www.disneyplus.com/play/...';field.value=ep.url||'';
+                  const saveUrl=document.createElement('button');saveUrl.type='button';saveUrl.textContent='Vincular';
+                  saveUrl.addEventListener('click',async()=>{try{await api('link',{id:String(show.jellyfin_id),episode_id:ep.id,episode_url:field.value.trim()});msg('Episodio vinculado.');}catch(_){msg('Error al vincular el episodio.');}});
+                  row.append(caption,field,saveUrl);box.append(row);
+                }
+              } catch (_) { msg('Error consultando episodios. Selecciona primero la serie.'); }
+            });
+            const container=document.createElement('div');
+            const title=document.createElement('label');title.textContent='Idioma / fuente / automático ';
+            const chklabel=document.createElement('label');chklabel.textContent='Automático ';chklabel.append(automatic);
+            container.append(language,source,chklabel,save,remove,episodes);
+            node.append(title,container);area.append(node);
+          }
+          msg('Series cargadas.');
+        } catch (_) { msg('No se pudieron cargar las series; configura la conexión primero.'); }
+      }
+      q('#msbRefresh').addEventListener('click',renderShows);
+      q('#msbScan').addEventListener('click', async () => {
+        try { await api('scan',{}); msg('Búsqueda solicitada.'); }
+        catch (_) { msg('Error al solicitar el trabajo.'); }
+      });
+      root.addEventListener('pageshow',loadConfig);
+    }());
+  </script>
+</div></body></html>

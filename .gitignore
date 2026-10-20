@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+bin/
+obj/
+**/bin/
+**/obj/
+dist/
+*.user
+*.suo
+*.log
+.env.local
+browser-profile/
+playwright-profile/
+__pycache__/
+.pytest_cache/

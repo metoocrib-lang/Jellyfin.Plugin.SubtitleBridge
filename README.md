@@ -1,30 +1,22 @@
 # Moonfin Subtitle Bridge — Jellyfin 12.2
 
-Complemento nativo experimental para Jellyfin 12.2 (.NET 10) que permite seleccionar series y gestionar sus preferencias de subtítulos desde el Dashboard de Jellyfin. Diseñado para comunicarse con un agente local auxiliar que integra Bazarr, Sonarr y un navegador con sesión autenticada de Disney+.
+Plugin nativo experimental para **Jellyfin 12.2 / .NET 10**. Configura series, idiomas y fuentes desde **Dashboard → Plugins**. El plugin actúa como interfaz de administración y se conecta a un agente local que coordina Sonarr/Bazarr y, experimentalmente, un navegador autenticado de Disney+.
 
-**Estado actual: desarrollo experimental; aún no es una versión lista para instalar.**
+**Estado: prototipo; pendiente de compilar y probar en un servidor real.** No publica ZIP instalables automáticamente hasta revisión.
 
-## Arquitectura
-
-- El plugin C# contiene la página de configuración y un controlador autenticado para administradores.
-- Un agente separado gestiona preferencias, importación de subtítulos a Bazarr y sesiones de navegador. No guarda credenciales de Disney+ en Jellyfin.
-- Moonfin utiliza la biblioteca de Jellyfin; el plugin no modifica el cliente Moonfin.
-- Los subtítulos protegidos, DRM y controles de acceso no se eluden.
-
-## Desarrollo
-
-Jellyfin 12.2 requiere .NET 10. Ejecutar:
-
+## Compilación
 ```bash
 dotnet build Jellyfin.Plugin.SubtitleBridge/Jellyfin.Plugin.SubtitleBridge.csproj -c Release
 ```
 
-Los workflows de GitHub Actions compilan y ejecutan comprobaciones. **No etiquetar ni publicar releases hasta confirmar que compilan y cargan correctamente.**
+## Configuración
+Tras instalar un ZIP compilado y reiniciar Jellyfin, en la configuración del complemento introduce la URL interna y el token del agente Docker existente, por ejemplo `http://moonfin-subtitle-bridge:8787`.
 
-## Despliegue
+La clave del agente no se transmite al navegador durante las operaciones del plugin (solo se muestra en la configuración para administradores con sesión autenticada); evita compartir capturas de esa configuración. Todos los endpoints de control requieren sesión de administrador de Jellyfin.
 
-El repo comienza privado. Un catálogo remoto en Jellyfin necesita URLs públicas (o un sistema privado de distribución controlado); para utilizar un repositorio GitHub estándar, publicar el repositorio únicamente cuando autorices visibilidad pública y haya una release válida.
+El plugin NO instala Docker ni tiene acceso por sí mismo a tu red local. El agente experimental de Disney+ aún requiere vincular URLs de episodios y no se ha probado con una cuenta real. No se evaden DRM ni controles de acceso.
 
-La red local Docker no es accesible desde GitHub Actions; la instalación y prueba contra el servidor Jellyfin local requieren una acción autorizada desde tu equipo. No subas archivos `.env`, tokens API ni perfiles/cookies de navegadores.
+## Publicación
+El repo puede compilar en privado, pero para un catálogo Jellyfin convencional deben ser accesibles públicamente tanto `manifest.json` como cada `sourceUrl`. No publiques ni crees un tag de release hasta pasar compilación y validación.
 
-Proyecto independiente no afiliado a Jellyfin, Moonfin, Disney+ o Bazarr.
+Proyecto independiente, no afiliado con Jellyfin, Moonfin ni las plataformas.
