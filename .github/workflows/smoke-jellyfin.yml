@@ -38,13 +38,22 @@ jobs:
           fi
           echo
           echo "Jellyfin health endpoint is healthy."
+          # A fresh Jellyfin server returns HTTP 503 for normal endpoints until the
+          # first-run wizard is completed. This is a disposable isolated CI instance.
+          setup=$(curl --max-time 5 -sS -o /tmp/jf-setup.txt -w '%{http_code}' -X POST http://127.0.0.1:18096/Startup/Complete || true)
+          echo "Complete initial setup status: $setup"
           echo "Route probe:"
-          code=$(curl --max-time 5 -sS -o /tmp/moonfin-probe.txt -w '%{http_code}' http://127.0.0.1:18096/MoonfinSubtitleBridge/health || true)
+          code=000
+          for i in $(seq 1 30); do
+            code=$(curl --max-time 5 -sS -o /tmp/moonfin-probe.txt -w '%{http_code}' http://127.0.0.1:18096/MoonfinSubtitleBridge/health || true)
+            if [ "$code" = "401" ] || [ "$code" = "403" ]; then break; fi
+            sleep 2
+          done
           echo "Unauthenticated plugin controller HTTP code: $code"
           echo "Relevant startup lines:"
           docker logs smoke-jellyfin 2>&1 | grep -Ei 'SubtitleBridge|Moonfin|plugin' | tail -40 || true
-          if [ "$code" = "404" ] || [ "$code" = "500" ] || [ "$code" = "000" ]; then
-            echo "Plugin controller route was not available or caused an error"
+          if [ "$code" != "401" ] && [ "$code" != "403" ]; then
+            echo "Expected admin-only plugin route (401/403), not $code"
             exit 1
           fi
       - name: Logs on failure
