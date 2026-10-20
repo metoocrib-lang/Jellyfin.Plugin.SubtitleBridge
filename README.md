@@ -9,7 +9,7 @@ Plugin nativo para administrar series, idiomas y fuentes de subtítulos desde el
 https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
 ```
 
-En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.7.0.0 (Jellyfin 12.2, .NET 10).
+En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.8.0.0 (Jellyfin 12.2, .NET 10).
 
 ## Configurar URLs de Bazarr / Sonarr / Radarr
 
@@ -72,6 +72,12 @@ Para series como **Bleach: Thousand-Year Blood War**, Sonarr/Jellyfin pueden usa
 ```
 
 Ejemplo: `17x49=4x9`. Las reglas son por serie, pueden representar rangos o episodios individuales, no admiten superposiciones ni un destino compartido. **Campo vacío**: numeración idéntica. **Campo con reglas**: los episodios sin equivalencia se omiten para evitar asignaciones erróneas. Los ID de serie y episodio de Sonarr/Bazarr no cambian: solo se traducen temporada y episodio enviados al agente para localizar la reproducción. Las equivalencias se aplican tanto a revisiones manuales como a episodios nuevos. Verifica los límites de temporadas cuando el catálogo cambie.
+
+### Procesar un episodio (manual, v0.8)
+
+En **Moonfin Subtitle Bridge → Motor de streaming y cuentas → Procesar un episodio**, elige una serie de Sonarr guardada con fuente Disney+, escribe la **temporada y episodio según Sonarr** y confirma explícitamente el envío. Por ejemplo, `Bleach` T17E02 se traduce a Disney+ T1E02 usando las reglas de equivalencias. El botón funciona aunque **Automático esté desactivado** y no inicia una revisión masiva.
+
+El plugin consulta en Bazarr solo la serie elegida, verifica ID, temporada/episodio, archivo y subtítulo de idioma pendiente, rechaza registros ambiguos y envía como máximo **un trabajo** al agente. Si Bazarr ya tiene el subtítulo, el agente rechazó el trabajo o sigue en período de espera de 24 horas, se informa de ello; un trabajo aceptado en cola **no demuestra importación exitosa**. Pulsa **Consultar estado y trabajos** y verifica Bazarr/Jellyfin después de finalizar.
 
 ### Activación basada en eventos
 
