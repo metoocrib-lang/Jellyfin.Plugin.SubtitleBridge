@@ -26,3 +26,5 @@ jobs:
         run: python -m unittest discover -s extractor/tests -v
       - name: Syntax check
         run: python -m compileall -q extractor
+      - name: Build Docker browser agent image (no credentials)
+        run: docker build --file extractor/Dockerfile --tag moonfin-disney-probe:ci .
