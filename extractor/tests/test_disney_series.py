@@ -1,4 +1,4 @@
-"""Offline checks for current Disney+ browse/entity series URLs and conservative matching."""
+"""Offline checks for current Disney+ browse/entity URLs and safe episode matching."""
 import unittest
 
 from extractor.episode_discovery import match_episode
@@ -9,14 +9,63 @@ from extractor.server import valid_job
 BLEACH = "https://www.disneyplus.com/es-419/browse/entity-571475d5-8b1a-453f-a57f-26bb4dd13304"
 
 
+class FakeSeasonButton:
+    def __init__(self, page):
+        self.page = page
+        self.first = self
+
+    def count(self):
+        return int(self.page.selected_season is not None)
+
+    def inner_text(self):
+        if self.page.selected_season is None:
+            raise AssertionError("No season button")
+        return f"Temporada {self.page.selected_season}"
+
+    def click(self, **kwargs):
+        self.page.dropdown_open = True
+
+
+class FakeOption:
+    def __init__(self, page, label):
+        self.page = page
+        self.label = label
+        self.last = self
+
+    def count(self):
+        return int(self.page.dropdown_open and self.label in
+                   [f"Temporada {s}" for s in self.page.seasons])
+
+    def click(self, **kwargs):
+        self.page.dropdown_open = False
+        if not self.page.ignore_selection:
+            self.page.selected_season = int(self.label.split()[-1])
+
+
 class FakePage:
-    def __init__(self, anchors, redirect=None):
+    def __init__(self, anchors, redirect=None, *, seasons=None, selected=None, ignore_selection=False):
         self.anchors = anchors
         self.redirect = redirect
         self.url = None
+        self.seasons = seasons or {}
+        self.selected_season = selected
+        self.ignore_selection = ignore_selection
+        self.dropdown_open = False
+        self.selected_any = False
 
     def goto(self, url, **kwargs):
         self.url = self.redirect or url
+
+    def get_by_role(self, role, name=None):
+        if role != "button":
+            raise AssertionError("Unexpected role")
+        return FakeSeasonButton(self)
+
+    def get_by_text(self, label, exact=False):
+        return FakeOption(self, label)
+
+    def wait_for_timeout(self, ms):
+        pass
 
     def locator(self, selector):
         if selector != "a[href]":
@@ -24,6 +73,8 @@ class FakePage:
         return self
 
     def evaluate_all(self, script):
+        if self.selected_season is not None:
+            return self.seasons.get(self.selected_season, [])
         return self.anchors
 
 
@@ -55,13 +106,66 @@ class DisneySeriesUrlTests(unittest.TestCase):
         job["series_url"] = "https://www.disneyplus.com/play/episode"
         self.assertFalse(valid_job(job))
 
-    def test_localized_episode_label_and_play_link(self):
+    def test_localized_episode_label_and_play_link_without_season_dropdown(self):
         page = FakePage([
             {"href": "/es-419/play/episode-a", "label": "T1:E1 THE BLOOD WARFARE"},
             {"href": "/es-419/play/episode-b", "label": "T1:E2 FOUNDATION STONES"},
         ])
         self.assertEqual(match_episode(page, BLEACH, 1, 1),
                          "https://www.disneyplus.com/es-419/play/episode-a")
+
+    def test_switches_season_and_identifies_bleach_numbered_episode(self):
+        page = FakePage([], selected=4, seasons={
+            4: [{"href": "/play/s4e1", "label": "1. EPISODIO DE TEMPORADA 4"}],
+            1: [
+                {"href": "/es-419/play/resume", "label": "CONTINUAR"},
+                {"href": "/es-419/play/other", "label": ""},
+                {"href": "/es-419/play/bleach-01", "label":
+                 "1. LA GUERRA DE SANGRE La Sociedad de Almas observa un aumento ... (26 min)"},
+                {"href": "/es-419/play/bleach-02", "label": "2. LAS PIEDRAS FUNDAMENTALES (26 min)"},
+                {"href": "/es-419/play/bleach-03", "label": "3. LA MARCHA DE LAS CRUCES"},
+            ]
+        })
+        self.assertEqual(match_episode(page, BLEACH, 1, 1),
+                         "https://www.disneyplus.com/es-419/play/bleach-01")
+        self.assertEqual(page.selected_season, 1)
+
+    def test_rejects_number_without_verified_season(self):
+        page = FakePage([
+            {"href": "/play/e1", "label": "1. LA GUERRA DE SANGRE"},
+            {"href": "/play/e2", "label": "2. LAS PIEDRAS FUNDAMENTALES"},
+        ])
+        with self.assertRaisesRegex(SubtitleError, "inequívoca"):
+            match_episode(page, BLEACH, 1, 1)
+
+    def test_rejects_unavailable_season(self):
+        page = FakePage([], selected=4, seasons={4: []})
+        with self.assertRaisesRegex(SubtitleError, "temporada solicitada"):
+            match_episode(page, BLEACH, 1, 1)
+
+    def test_rejects_season_that_did_not_change(self):
+        page = FakePage([], selected=4, seasons={1: [
+            {"href": "/play/e1", "label": "1. LA GUERRA DE SANGRE"},
+            {"href": "/play/e2", "label": "2. LAS PIEDRAS FUNDAMENTALES"},
+        ]}, ignore_selection=True)
+        with self.assertRaisesRegex(SubtitleError, "no confirmó"):
+            match_episode(page, BLEACH, 1, 1)
+
+    def test_duplicate_numbered_episode_refuses_to_guess(self):
+        page = FakePage([], selected=1, seasons={1: [
+            {"href": "/play/sub", "label": "1. LA GUERRA DE SANGRE"},
+            {"href": "/play/dub", "label": "1. LA GUERRA DE SANGRE"},
+            {"href": "/play/e2", "label": "2. SIGUIENTE"},
+        ]})
+        with self.assertRaisesRegex(SubtitleError, "inequívoca"):
+            match_episode(page, BLEACH, 1, 1)
+
+    def test_numbered_episode_without_neighbor_is_not_enough(self):
+        page = FakePage([], selected=1, seasons={1: [
+            {"href": "/play/unverified", "label": "1. ALGUNA RECOMENDACIÓN"},
+        ]})
+        with self.assertRaisesRegex(SubtitleError, "inequívoca"):
+            match_episode(page, BLEACH, 1, 1)
 
     def test_ambiguous_sub_and_dub_does_not_guess(self):
         page = FakePage([
