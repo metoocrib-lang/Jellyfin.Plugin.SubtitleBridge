@@ -43,7 +43,7 @@ En **Moonfin Subtitle Bridge v0.6**:
 
 1. En “Motor de streaming y cuentas”, URL `http://moonfin-streaming-agent:8787` y token igual que `BRIDGE_API_TOKEN`. Guarda.
 2. Abre “Cargar series de Sonarr”, elige una serie y la fuente `Disney+`.
-3. Especifica la **URL de la página de la serie** en Disney+ (también se admite `https://www.disneyplus.com/es-419/browse/entity-UUID`), idioma (por ejemplo `es`) y marca Automático. Guarda.
+3. Especifica la **URL de la página de la serie** en Disney+ (también se admite `https://www.disneyplus.com/es-419/browse/entity-UUID`), idioma (por ejemplo `es`) y marca Automático. Si Sonarr y Disney+ organizan distinto las temporadas, añade equivalencias (`17x1-13=1x1` etc.) en la configuración de esa serie. Guarda.
 4. En “Cuentas de streaming”, pulsa “Iniciar sesión en Disney+”.
 
 ## 4. Iniciar sesión en Disney+ sin compartir credenciales
