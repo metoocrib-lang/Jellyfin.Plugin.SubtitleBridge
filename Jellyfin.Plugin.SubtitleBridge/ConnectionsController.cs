@@ -10,8 +10,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace Jellyfin.Plugin.SubtitleBridge;
 
 /// <summary>
-/// The Jellyfin server calls Bazarr, Sonarr and Radarr directly. API keys never
-/// leave Jellyfin for the user's browser or appear in response bodies.
+/// Jellyfin calls Bazarr, Sonarr and Radarr directly, and never includes API
+/// keys in this controller's response. Jellyfin's administrator configuration
+/// API can still expose the stored keys to authenticated administrators.
 /// </summary>
 [ApiController]
 [Route("MoonfinSubtitleBridge/connections")]
