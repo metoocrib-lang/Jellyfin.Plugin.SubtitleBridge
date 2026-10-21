@@ -46,6 +46,10 @@ GitHub Actions compila, genera ZIP y ejecuta un smoke test con Jellyfin 12.2 Doc
 Nunca publiques API keys, contraseñas, cookies ni perfiles de navegador en GitHub. El plugin almacena las API keys en la configuración del servidor Jellyfin (protege tu directorio /config, respaldos y usuarios administradores). Proyecto independiente y no afiliado a Jellyfin ni plataformas.
 
 
+## Integración con Bazarr+ (prototipo independiente)
+
+Se está desarrollando un adaptador para el **Provider Hub de Bazarr+**, alojado en [`integrations/bazarr-plus/`](integrations/bazarr-plus/README.md). La implementación inicial permite buscar SRT **ya disponibles** en la caché privada del agente y devolverlos a Bazarr+ para que este realice la importación; el encolado asíncrono desde una búsqueda es **opcional y está desactivado por defecto**. Solo Disney+ / episodios / español; requiere una serie identificada por TVDB y reglas explícitas. **Aún no está publicado en el Marketplace ni probado con un Bazarr+ real.** No sustituye el Bazarr oficial ni modifica la configuración existente.
+
 ## Extractores desde plataformas de streaming (experimental)
 
 El extractor Disney+ está en [`extractor/`](extractor/README.md): navegador local con sesión iniciada por el usuario, captura HLS/WebVTT accesible, conversión a SRT e importación opcional en Bazarr. Actualmente incluye un **agente residente** que recibe episodios desde Jellyfin y un modo de prueba manual por URL de episodio. La identificación del episodio en el catálogo sigue siendo conservadora y puede fallar si Disney+ cambia su web. Netflix, Prime, Max y Apple TV+ son conectores pendientes. No se eluden DRM ni controles de acceso.
