@@ -131,3 +131,30 @@ catch (SingleEpisodeError error)
     Expect(error.Code == "ambiguous_episode", "Ambiguous Bazarr diagnostic");
 }
 Console.WriteLine("Single episode diagnostics: all checks passed.");
+
+
+// Dry-run wanted-list matching uses precisely the fields of the automatic
+// dispatcher and must never produce a job for another series or episode.
+using var wanted = System.Text.Json.JsonDocument.Parse("""
+{"data":[{"sonarrSeriesId":42,"sonarrEpisodeId":2801,"episode_number":"17x3",
+"missing_subtitles":[{"code2":"es","forced":false,"hi":false}]}]}
+""");
+var eligible = AutomaticDetectionWanted.Evaluate(wanted.RootElement, 42, 17, 3, "es");
+Expect(eligible.Found && eligible.MissingLanguage && eligible.SonarrEpisodeId == 2801,
+    "Wanted selection recognizes exact Bleach episode");
+Expect(!AutomaticDetectionWanted.Evaluate(wanted.RootElement, 42, 17, 4, "es").Found,
+    "Wanted selection rejects unrelated episode");
+Expect(!AutomaticDetectionWanted.Evaluate(wanted.RootElement, 43, 17, 3, "es").Found,
+    "Wanted selection rejects unrelated Sonarr series");
+Expect(!AutomaticDetectionWanted.Evaluate(wanted.RootElement, 42, 17, 3, "en").MissingLanguage,
+    "Wanted selection does not infer a missing language");
+using var hiWanted = System.Text.Json.JsonDocument.Parse("""
+{"data":[{"sonarrSeriesId":42,"sonarrEpisodeId":2801,"episode_number":"17x3",
+"missing_subtitles":[{"code2":"es","forced":false,"hi":true}]}]}
+""");
+Expect(!AutomaticDetectionWanted.Evaluate(hiWanted.RootElement, 42, 17, 3, "es").MissingLanguage,
+    "HI-only subtitling must not be treated as normal subtitling");
+using var missing = System.Text.Json.JsonDocument.Parse("""{"data":[]}""");
+Expect(!AutomaticDetectionWanted.Evaluate(missing.RootElement, 42, 17, 3, "es").Found,
+    "Missing wanted row does not dispatch anything");
+Console.WriteLine("Automatic detection read-only wanted checks: passed.");
