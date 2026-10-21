@@ -108,6 +108,10 @@ class AgentCacheTests(unittest.TestCase):
         self.state = patch.dict(os.environ, {
             "STATE_FILE": str(Path(self.dir.name) / "state" / "attempts.json")})
         self.state.start()
+        # server.PERSIST is resolved at import time; isolate it from /data.
+        self.persist_patch = patch.object(server, "PERSIST",
+            Path(self.dir.name) / "state" / "attempts.json")
+        self.persist_patch.start()
         self.queue = queue.Queue(maxsize=30)
         self.saved_queue = server.QUEUE
         self.saved_last = dict(server.LAST_RUN)
@@ -118,6 +122,7 @@ class AgentCacheTests(unittest.TestCase):
         server.QUEUE = self.saved_queue
         server.LAST_RUN.clear()
         server.LAST_RUN.update(self.saved_last)
+        self.persist_patch.stop()
         self.state.stop()
         self.dir.cleanup()
 
