@@ -8,5 +8,6 @@
   <ItemGroup>
     <Compile Include="../../Jellyfin.Plugin.SubtitleBridge/EpisodeMapper.cs" Link="EpisodeMapper.cs" />
     <Compile Include="../../Jellyfin.Plugin.SubtitleBridge/SingleEpisodePlanner.cs" Link="SingleEpisodePlanner.cs" />
+    <Compile Include="../../Jellyfin.Plugin.SubtitleBridge/AutomaticDetectionWanted.cs" Link="AutomaticDetectionWanted.cs" />
   </ItemGroup>
 </Project>
