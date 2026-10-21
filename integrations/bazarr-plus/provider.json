@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "provider_id": "moonfinbridge",
+  "name": "Moonfin Bridge (Disney+)",
+  "version": "0.1.0",
+  "description": "Returns ready-to-download Disney+ SRTs from the private Moonfin agent; optional asynchronous extraction on cache misses. Experimental, user-authenticated.",
+  "api_version": "bazarr.provider-hub.v1",
+  "entry_module": "provider",
+  "entry_class": "MoonfinBridgeProvider",
+  "config_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "agent_url",
+      "bridge_token",
+      "series_json"
+    ],
+    "properties": {
+      "agent_url": {
+        "type": "string",
+        "title": "Moonfin agent URL",
+        "description": "Private Docker URL reachable from the Bazarr+ worker (e.g. http://moonfin-streaming-agent:8787)",
+        "minLength": 1
+      },
+      "bridge_token": {
+        "type": "string",
+        "title": "Bridge API token",
+        "secret": true,
+        "minLength": 32
+      },
+      "series_json": {
+        "type": "string",
+        "title": "Series map (TVDB to Disney+ URL and episode mappings)",
+        "description": "JSON array: [{\"tvdb_id\":123,\"series_url\":\"https://www.disneyplus.com/es-419/browse/entity-UUID\",\"mapping\":\"17x1-13=1x1\"}]",
+        "minLength": 2
+      },
+      "enable_requests": {
+        "type": "boolean",
+        "title": "Queue new extractions during search",
+        "description": "Opt-in. May queue new browser work when Bazarr searches. Only ready SRTs appear in results.",
+        "default": false
+      }
+    }
+  },
+  "secret_fields": [
+    "bridge_token"
+  ],
+  "supported_media": [
+    "episode"
+  ],
+  "languages": [
+    "spa"
+  ],
+  "files": {
+    "provider.py": "5702d5078d4906d9430c7821e078ba1a3bd3e070322393d5fecef529a836e896"
+  },
+  "bundle_sha256": "4d0a84c67da05afae0aa0584fb1370573c16d1ea12e096b74c233d2ef9a27dfa",
+  "source": {
+    "type": "github",
+    "repo": "metoocrib-lang/Jellyfin.Plugin.SubtitleBridge",
+    "ref": "main",
+    "commit": "0000000000000000000000000000000000000000",
+    "path": "integrations/bazarr-plus",
+    "catalog_url": "https://github.com/LavX/bazarr-provider-catalog/blob/main/catalog.json",
+    "trusted": false
+  },
+  "dependencies": {
+    "requirements": []
+  }
+}

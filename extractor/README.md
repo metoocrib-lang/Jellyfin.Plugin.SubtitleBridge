@@ -34,6 +34,10 @@
 python -m unittest discover -s extractor/tests -v
 ```
 
+## Bazarr+ como proveedor (prototipo)
+
+El agente residente incluye una API privada de búsqueda en caché y descarga de SRT (`/v1/provider/lookup` y `/v1/provider/download`), protegida por el mismo `X-Bridge-Key`. Los trabajos que lleguen desde el [proveedor Bazarr+](../integrations/bazarr-plus/README.md) **no** se suben directamente a Bazarr: el SRT se almacena en el volumen `streaming_state` y Bazarr+ se encargaría de importarlo tras seleccionarlo. Esta funcionalidad todavía no está publicada en el Marketplace y requiere validación en un entorno Bazarr+ aislado.
+
 ## Agente residente controlado por Jellyfin (v0.6)
 
 Además de la prueba manual de un episodio descrita arriba, el proyecto incluye `compose.agent.yml`: servidor autenticado con cola limitada y navegador privado. Jellyfin programa las revisiones, consulta Bazarr y envía los episodios faltantes. El agente intenta encontrar el enlace de reproducción por número de temporada/capítulo; no usa contraseñas del usuario ni elude DRM. Usa `/v1/status`, `/v1/login` y `/v1/scan` con el encabezado secreto `X-Bridge-Key`.
