@@ -19,6 +19,32 @@ public static class StreamingScanDispatcher
     public static async Task<ScanSummary> ScanAsync(
         CancellationToken ct, int? onlySeriesId = null, int? onlySeason = null, int? onlyEpisode = null)
     {
+        // Automatic ItemAdded calls pass all three coordinates. Resolve the
+        // exact Sonarr episode through the same Bazarr /api/episodes endpoint
+        // proven by "Procesar un episodio". The global wanted list can omit
+        // valid missing-subtitle episodes or truncate them after 500 entries.
+        // Never let a partial selector fall through to a bulk scan.
+        if (onlySeriesId.HasValue || onlySeason.HasValue || onlyEpisode.HasValue)
+        {
+            if (!onlySeriesId.HasValue || !onlySeason.HasValue || !onlyEpisode.HasValue
+                || onlySeriesId.Value < 1 || onlySeason.Value < 0 || onlyEpisode.Value < 1)
+                throw new ArgumentException("La detección automática requiere serie, temporada y episodio.");
+
+            var config = Plugin.Instance?.Configuration
+                ?? throw new InvalidOperationException("Plugin no inicializado");
+            var matches = (config.TrackedItems ?? []).Where(item =>
+                item.Id == onlySeriesId.Value
+                && string.Equals(item.Service, "sonarr", StringComparison.OrdinalIgnoreCase))
+                .Take(2).ToArray();
+            if (matches.Length != 1 || !matches[0].Automatic
+                || !string.Equals(matches[0].Source, "disney", StringComparison.OrdinalIgnoreCase))
+                return new ScanSummary(0, 0, "La serie no tiene Disney+ automático habilitado.");
+
+            var single = await ScanSingleAsync(onlySeriesId.Value,
+                onlySeason.Value, onlyEpisode.Value, ct).ConfigureAwait(false);
+            return new ScanSummary(1, single.Queued, single.Message);
+        }
+
         var cfg = Plugin.Instance?.Configuration ?? throw new InvalidOperationException("Plugin no inicializado");
         if (string.IsNullOrWhiteSpace(cfg.BazarrApiKey) ||
             !SafeHttpUri(cfg.BazarrUrl, out var bazarr) ||

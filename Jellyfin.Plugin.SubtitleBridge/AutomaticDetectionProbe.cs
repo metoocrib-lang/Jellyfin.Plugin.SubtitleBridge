@@ -120,11 +120,15 @@ public static class AutomaticDetectionProbe
             mappingOk ? $"Equivalencia encontrada: Sonarr T{season}E{episode} → streaming T{providerSeason}E{providerEpisode}." :
                 "Las reglas no incluyen este episodio o contienen errores."));
 
-        var bazarrPending = await ReadBazarrWantedAsync(cfg.BazarrUrl, cfg.BazarrApiKey,
-            seriesId, season, episode, follow.Language, ct).ConfigureAwait(false);
-        checks.Add(new Check("bazarr_wanted", bazarrPending,
-            bazarrPending ? "Bazarr indica que falta el subtítulo normal del idioma seleccionado." :
-            "Bazarr no informa ese subtítulo como pendiente en la lista examinada (hasta 500 episodios)."));
+        // Use the exact same Bazarr episode validation as the manual button
+        // and the automatic ItemAdded path, not Bazarr's limited global wanted list.
+        var bazarrPending = providerOk && mappingOk && !string.IsNullOrWhiteSpace(follow.Language)
+            && await ReadBazarrEpisodeAsync(cfg.BazarrUrl, cfg.BazarrApiKey,
+                seriesId, season, episode, follow.Language, follow.Source,
+                follow.StreamingUrl, follow.EpisodeMapping, ct).ConfigureAwait(false);
+        checks.Add(new Check("bazarr_episode", bazarrPending,
+            bazarrPending ? "Bazarr confirma el archivo del episodio y el subtítulo normal pendiente." :
+            "Bazarr no confirma el archivo y un subtítulo normal pendiente para este episodio, o faltan ajustes previos."));
 
         return new Report(checks.All(x => x.Ok), providerSeason, providerEpisode,
             "Simulación de requisitos, solo lectura: no reproduce ItemAdded ni envía trabajos. " +
@@ -163,42 +167,27 @@ public static class AutomaticDetectionProbe
         return null;
     }
 
-    private static async Task<bool> ReadBazarrWantedAsync(string? url, string? apiKey,
-        int seriesId, int season, int episode, string language, CancellationToken ct)
+    private static async Task<bool> ReadBazarrEpisodeAsync(string? url, string? apiKey,
+        int seriesId, int season, int episode, string language,
+        string provider, string streamingUrl, string? mapping, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(apiKey) ||
             !StreamingScanDispatcher.SafeHttpUri(url, out var bazarr))
             throw new SingleEpisodeError("bazarr_not_configured",
                 "Configura y prueba primero la URL y clave API de Bazarr.");
 
-        var found = false;
-        var pending = false;
-        for (var start = 0; start < 500; start += 100)
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get,
-                new Uri(bazarr!.AbsoluteUri.TrimEnd('/') + "/api/episodes/wanted?start="
-                    + start + "&length=100"));
-            request.Headers.TryAddWithoutValidation("X-API-KEY", apiKey);
-            using var response = await SendSafelyAsync(request, "Bazarr", ct).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-                throw new SingleEpisodeError("bazarr_http_error",
-                    $"Bazarr rechazó la consulta (HTTP {(int)response.StatusCode}).", 502);
-            var bytes = await ReadSafelyAsync(response, 2_000_000, "Bazarr", ct).ConfigureAwait(false);
-            using var document = JsonDocument.Parse(bytes);
-            var page = AutomaticDetectionWanted.Evaluate(document.RootElement,
-                seriesId, season, episode, language);
-            if (page.Found)
-            {
-                if (found)
-                    throw new SingleEpisodeError("ambiguous_episode",
-                        "Bazarr devuelve varias filas para ese episodio.");
-                found = true;
-                pending = page.MissingLanguage;
-            }
-            var items = document.RootElement.GetProperty("data");
-            if (items.GetArrayLength() < 100) break;
-        }
-        return found && pending;
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            new Uri(bazarr!.AbsoluteUri.TrimEnd('/') + "/api/episodes?seriesid%5B%5D="
+                + seriesId.ToString(CultureInfo.InvariantCulture)));
+        request.Headers.TryAddWithoutValidation("X-API-KEY", apiKey);
+        using var response = await SendSafelyAsync(request, "Bazarr", ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            throw new SingleEpisodeError("bazarr_http_error",
+                $"Bazarr rechazó la consulta (HTTP {(int)response.StatusCode}).", 502);
+        var bytes = await ReadSafelyAsync(response, 4_000_000, "Bazarr", ct).ConfigureAwait(false);
+        using var document = JsonDocument.Parse(bytes);
+        return SingleEpisodePlanner.Plan(document.RootElement, seriesId, season, episode,
+            language, provider, streamingUrl, mapping) is not null;
     }
 
     private static async Task<HttpResponseMessage> SendSafelyAsync(

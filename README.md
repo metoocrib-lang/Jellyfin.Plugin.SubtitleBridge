@@ -9,7 +9,7 @@ Plugin nativo para administrar series, idiomas y fuentes de subtítulos desde el
 https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
 ```
 
-En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.9.0.0 (Jellyfin 12.2, .NET 10).
+En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.9.1.0 (Jellyfin 12.2, .NET 10).
 
 ## Configurar URLs de Bazarr / Sonarr / Radarr
 
@@ -87,9 +87,11 @@ El plugin consulta en Bazarr solo la serie elegida, verifica ID, temporada/episo
 
 ### Probar detección automática (solo lectura, v0.9)
 
-En **Motor de streaming y cuentas**, selecciona la serie Sonarr (por ejemplo Bleach), escribe temporada y episodio según Sonarr (17 y 3) y pulsa **Probar detección automática**. Esta comprobación de diagnóstico **no importa subtítulos, no envía solicitudes al agente, no altera archivos y no simula el evento ItemAdded**. Muestra paso a paso si la serie tiene Automático habilitado, el agente está configurado, Sonarr devuelve TVDB, el episodio físico ya existe en Jellyfin con TVDB coincidente, hay una regla de equivalencia, y el episodio figura pendiente en el listado de Bazarr (máximo primeras 500 entradas). Si alguna comprobación falla, revísala antes de realizar pruebas con episodios nuevos.
+En **Motor de streaming y cuentas**, selecciona la serie Sonarr (por ejemplo Bleach), escribe temporada y episodio según Sonarr (17 y 3) y pulsa **Probar detección automática**. Esta comprobación de diagnóstico **no importa subtítulos, no envía solicitudes al agente, no altera archivos y no simula el evento ItemAdded**. Muestra paso a paso si la serie tiene Automático habilitado, el agente está configurado, Sonarr devuelve TVDB, el episodio físico ya existe en Jellyfin con TVDB coincidente, hay una regla de equivalencia, y el episodio figura pendiente en el listado de Bazarr (consulta completa de la serie en Bazarr). Si alguna comprobación falla, revísala antes de realizar pruebas con episodios nuevos. La versión 0.9.1 usa la misma consulta de episodio específico que el botón manual, porque la lista global de pendientes de Bazarr puede omitir episodios descargados. Si procesaste T17E03 manualmente y ya tiene subtítulos, es correcto que el diagnóstico deje de marcarlo como pendiente.
 
 El resultado «requisitos listos» no garantiza que se produzca una detección automática retroactiva: solo los episodios realmente nuevos generan ItemAdded en Jellyfin. Para episodios ya indexados usa el botón manual separado **Procesar un episodio** si necesitas importar subtítulos; esa acción sí modifica Bazarr tras confirmación.
+
+**Corrección de detección automática en 0.9.1:** los eventos de episodio nuevo, que ya conocen serie/temporada/episodio, consultan `/api/episodes?seriesid[]=ID` en lugar de depender de las primeras 500 filas de `/api/episodes/wanted`. El episodio debe tener archivo físico y necesitar el idioma configurado; su ID Sonarr no cambia y la traducción de T/E a Disney+ se conserva. La consulta global para Revisar ahora (manual) mantiene su límite de 30 trabajos. El diagnóstico sigue siendo de solo lectura.
 
 ### Activación basada en eventos
 
