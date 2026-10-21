@@ -150,6 +150,10 @@ class AgentCacheTests(unittest.TestCase):
         self.assertEqual(ready["sha256"], hashlib.sha256(SRT).hexdigest())
         self.assertEqual(provider_bridge.get_cached(ready["id"]), SRT)
         self.assertEqual(server.provider_lookup({**self.request(), "episode": 4})["state"], "absent")
+        # Different Disney+ mapping or title must not reuse the old SRT.
+        self.assertEqual(server.provider_lookup({
+            **self.request(), "streaming_episode": 4
+        })["state"], "absent")
 
     def test_cooldown_cannot_create_duplicate_jobs(self):
         self.assertEqual(server.provider_lookup(self.request(enqueue=True))["state"], "queued")
