@@ -9,7 +9,7 @@ Plugin nativo para administrar series, idiomas y fuentes de subtítulos desde el
 https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
 ```
 
-En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.8.1.0 (Jellyfin 12.2, .NET 10).
+En **Plugins → Catalog**, instala `Moonfin Subtitle Bridge` y reinicia Jellyfin. Versión actual: 0.9.0.0 (Jellyfin 12.2, .NET 10).
 
 ## Configurar URLs de Bazarr / Sonarr / Radarr
 
@@ -84,6 +84,12 @@ En **Moonfin Subtitle Bridge → Motor de streaming y cuentas → Procesar un ep
 El plugin consulta en Bazarr solo la serie elegida, verifica ID, temporada/episodio, archivo y subtítulo de idioma pendiente, rechaza registros ambiguos y envía como máximo **un trabajo** al agente. Si Bazarr ya tiene el subtítulo, el agente rechazó el trabajo o sigue en período de espera de 24 horas, se informa de ello; un trabajo aceptado en cola **no demuestra importación exitosa**. Pulsa **Consultar estado y trabajos** y verifica Bazarr/Jellyfin después de finalizar.
 
 **Errores de procesamiento individual (v0.8.1):** el botón informa ahora de la causa segura y un código corto como `unmapped_episode`, `bazarr_unauthorized`, `agent_unreachable` o `agent_rejected` en lugar de responder siempre con un genérico HTTP 409. El código de error identifica dónde revisar; nunca muestra tokens, respuestas completas o URLs firmadas. Si aparece un mensaje, no vuelvas a enviar el trabajo sin revisarlo.
+
+### Probar detección automática (solo lectura, v0.9)
+
+En **Motor de streaming y cuentas**, selecciona la serie Sonarr (por ejemplo Bleach), escribe temporada y episodio según Sonarr (17 y 3) y pulsa **Probar detección automática**. Esta comprobación de diagnóstico **no importa subtítulos, no envía solicitudes al agente, no altera archivos y no simula el evento ItemAdded**. Muestra paso a paso si la serie tiene Automático habilitado, el agente está configurado, Sonarr devuelve TVDB, el episodio físico ya existe en Jellyfin con TVDB coincidente, hay una regla de equivalencia, y el episodio figura pendiente en el listado de Bazarr (máximo primeras 500 entradas). Si alguna comprobación falla, revísala antes de realizar pruebas con episodios nuevos.
+
+El resultado «requisitos listos» no garantiza que se produzca una detección automática retroactiva: solo los episodios realmente nuevos generan ItemAdded en Jellyfin. Para episodios ya indexados usa el botón manual separado **Procesar un episodio** si necesitas importar subtítulos; esa acción sí modifica Bazarr tras confirmación.
 
 ### Activación basada en eventos
 
