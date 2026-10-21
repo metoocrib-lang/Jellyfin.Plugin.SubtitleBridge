@@ -97,6 +97,11 @@
         <label class="inputLabel" for="msbSingleEpisode">Episodio en Sonarr</label>
         <input id="msbSingleEpisode" is="emby-input" type="number" min="1" max="999" step="1" placeholder="Ej.: 2"/>
       </div>
+      <h4>Prueba de detección automática (sin cambios)</h4>
+      <p>Usa la serie, temporada y episodio de los campos anteriores. Comprueba Jellyfin, coincidencia TVDB con Sonarr, equivalencias, Automático y subtítulo pendiente en Bazarr. No descarga, no crea eventos de biblioteca y no envía trabajos al agente.</p>
+      <button type="button" is="emby-button" class="raised" id="msbDetectionTest">Probar detección automática</button>
+      <div id="msbDetectionResult" role="status" aria-live="polite"></div>
+      <h4>Importación manual (requiere confirmación)</h4>
       <button type="button" is="emby-button" class="raised" id="msbSingleSubmit">Procesar un episodio</button>
       <div id="msbSingleResult" role="status" aria-live="polite"></div>
       <p><strong>Experimental:</strong> Disney+ intentará identificar episodios por enlaces etiquetados inequívocamente; si el catálogo no expone esos datos, aparecerá “episodio_no_identificado” y no se descargará nada. Netflix, Prime, Max y Apple TV+ aún no tienen extractores operativos.</p>
@@ -465,6 +470,51 @@
         q('#msbStreamingOutput').textContent = JSON.stringify(result, null, 2);
         message('Estado actualizado.');
       } catch (err) { message(errorText(err, 'Agente de streaming no disponible.')); }
+    });
+    q('#msbDetectionTest').addEventListener('click', async () => {
+      const btn = q('#msbDetectionTest');
+      const output = q('#msbDetectionResult');
+      const id = Number(q('#msbSingleSeries').value);
+      const seasonText = q('#msbSingleSeason').value.trim();
+      const episodeText = q('#msbSingleEpisode').value.trim();
+      const season = Number(seasonText);
+      const episode = Number(episodeText);
+      if (!Number.isSafeInteger(id) || id < 1 || !seasonText || !episodeText
+          || !Number.isInteger(season) || season < 0 || season > 100
+          || !Number.isInteger(episode) || episode < 1 || episode > 999) {
+        output.textContent = 'Selecciona la serie, temporada y episodio según Sonarr.';
+        return;
+      }
+      btn.disabled = true;
+      output.textContent = 'Verificando requisitos de detección (solo lectura)…';
+      try {
+        const result = await api('streaming/detection-test?seriesId=' + encodeURIComponent(id)
+          + '&season=' + encodeURIComponent(season)
+          + '&episode=' + encodeURIComponent(episode));
+        output.replaceChildren();
+        const checks = result.checks || result.Checks || [];
+        const heading = document.createElement('p');
+        const ready = result.ready === true || result.Ready === true;
+        heading.textContent = ready
+          ? 'Los requisitos comprobados están listos. No se ha enviado ningún trabajo.'
+          : 'Hay requisitos pendientes. No se ha enviado ningún trabajo.';
+        output.append(heading);
+        for (const entry of checks) {
+          const line = document.createElement('p');
+          const ok = entry.ok === true || entry.Ok === true;
+          const note = entry.message || entry.Message || 'Sin información';
+          line.textContent = (ok ? '✓ ' : '✗ ') + String(note).slice(0, 350);
+          output.append(line);
+        }
+        const note = document.createElement('p');
+        note.textContent = result.notice || result.Notice
+          || 'Esta prueba no reproduce el evento de episodio nuevo de Jellyfin.';
+        output.append(note);
+      } catch (e) {
+        output.textContent = errorText(e, 'No se pudieron comprobar los requisitos.');
+      } finally {
+        btn.disabled = false;
+      }
     });
     q('#msbSingleSubmit').addEventListener('click', async () => {
       const btn = q('#msbSingleSubmit');

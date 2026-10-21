@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using MediaBrowser.Common.Api;
+using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,6 +17,44 @@ public sealed class StreamingController : ControllerBase
     {
         Timeout = TimeSpan.FromSeconds(20)
     };
+
+    private readonly ILibraryManager _library;
+
+    public StreamingController(ILibraryManager library)
+    {
+        _library = library;
+    }
+
+    /// <summary>
+    /// Read-only diagnostic for an already-indexed episode. Never dispatches
+    /// an agent scan or creates a Jellyfin library event.
+    /// </summary>
+    [HttpGet("detection-test")]
+    public async Task<IActionResult> DetectionTest(
+        [FromQuery] int seriesId, [FromQuery] int season, [FromQuery] int episode,
+        CancellationToken ct)
+    {
+        if (seriesId < 1 || season < 0 || season > 100 || episode < 1 || episode > 999)
+            return BadRequest(new { error = "Indica una serie, temporada y episodio válidos." });
+        try
+        {
+            return Ok(await AutomaticDetectionProbe.InspectAsync(
+                _library, seriesId, season, episode, ct).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (SingleEpisodeError error)
+        {
+            return StatusCode(error.HttpStatus, new { error = error.Message, code = error.Code });
+        }
+        catch (Exception error) when (error is JsonException or FormatException
+            or InvalidOperationException or HttpRequestException or TaskCanceledException)
+        {
+            return StatusCode(502, new {
+                error = "No se pudieron comprobar los datos de Sonarr, Jellyfin o Bazarr.",
+                code = "probe_data_error"
+            });
+        }
+    }
 
     [HttpGet("status")]
     public Task<IActionResult> Status(CancellationToken ct) => Relay(HttpMethod.Get, "/v1/status", null, ct);
