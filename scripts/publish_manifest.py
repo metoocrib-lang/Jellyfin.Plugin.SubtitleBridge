@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 GUID = "b8e43169-c5f4-41d3-a9a0-8f4b9f85d792"
-VERSION = "0.8.1.0"
+VERSION = "0.9.0.0"
 ABI = "12.2.0.0"
 
 
@@ -20,7 +20,7 @@ def publish(manifest: Path, archive: Path, repo: str, tag: str):
     checksum = hashlib.md5(archive.read_bytes()).hexdigest()
     versions = [{
         "version": VERSION,
-        "changelog": "Corrección de los mensajes de error en Procesar un episodio; diagnóstico de conexión Bazarr, agente, equivalencias y configuración sin exponer secretos.",
+        "changelog": "Botón de diagnóstico sin cambios para verificar detección automática por episodio: biblioteca Jellyfin, TVDB Sonarr, reglas y pendientes Bazarr.",
         "targetAbi": ABI,
         "sourceUrl": f"https://github.com/{repo}/releases/download/{tag}/{archive.name}",
         "checksum": checksum,
