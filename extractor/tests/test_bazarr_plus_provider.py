@@ -34,6 +34,16 @@ SRT = b"1\n00:00:01,000 --> 00:00:02,000\nHola!\n"
 
 
 class ProviderTests(unittest.TestCase):
+    def test_provider_hub_manifest_hashes(self):
+        manifest = json.loads((MODULE.parent / "provider.json").read_text(encoding="utf-8"))
+        contents = MODULE.read_bytes()
+        self.assertEqual(manifest["api_version"], "bazarr.provider-hub.v1")
+        self.assertEqual(manifest["files"]["provider.py"], hashlib.sha256(contents).hexdigest())
+        canonical = b"provider.py\\0" + str(len(contents)).encode("ascii") + b"\\0" + contents + b"\\0"
+        self.assertEqual(manifest["bundle_sha256"], hashlib.sha256(canonical).hexdigest())
+        self.assertIn("bridge_token", manifest["secret_fields"])
+        self.assertFalse(manifest["config_schema"]["properties"]["enable_requests"]["default"])
+
     def test_mapper_strict_and_cours(self):
         self.assertEqual(provider.map_episode(RULES, 17, 3), (1, 3))
         self.assertEqual(provider.map_episode(RULES, 17, 14), (2, 1))
