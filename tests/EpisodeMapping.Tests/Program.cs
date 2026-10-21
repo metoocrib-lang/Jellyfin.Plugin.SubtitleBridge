@@ -158,3 +158,23 @@ using var missing = System.Text.Json.JsonDocument.Parse("""{"data":[]}""");
 Expect(!AutomaticDetectionWanted.Evaluate(missing.RootElement, 42, 17, 3, "es").Found,
     "Missing wanted row does not dispatch anything");
 Console.WriteLine("Automatic detection read-only wanted checks: passed.");
+
+// Reproduce real-world mismatch: /api/episodes/wanted reports nothing, but
+// /api/episodes?seriesid[]=42 confirms the physical file and missing Spanish.
+// Both the event path and read-only probe now use this exact episode record.
+using var noGlobalWanted = System.Text.Json.JsonDocument.Parse("""{"data":[]}""");
+Expect(!AutomaticDetectionWanted.Evaluate(noGlobalWanted.RootElement, 42, 17, 3, "es").Found,
+    "Global wanted list may omit a physically present episode.");
+using var exactBazarr = System.Text.Json.JsonDocument.Parse("""
+{"data":[{"sonarrSeriesId":42,"sonarrEpisodeId":2801,"season":17,"episode":3,
+"path":"/tv/Bleach/S17E03.mkv",
+"missing_subtitles":[{"code2":"es","forced":false,"hi":false}]}]}
+""");
+var exactPlan = SingleEpisodePlanner.Plan(exactBazarr.RootElement, 42, 17, 3,
+    "es", "disney", "https://www.disneyplus.com/es-419/browse/entity-571475d5-8b1a-453f-a57f-26bb4dd13304",
+    bleach);
+Expect(exactPlan is not null && exactPlan.SonarrEpisodeId == 2801
+    && exactPlan.StreamingSeason == 1 && exactPlan.StreamingEpisode == 3,
+    "The exact Bazarr series lookup must recover missing subtitles excluded from wanted.");
+Console.WriteLine("Exact Bazarr episode lookup: missing global wanted regression passed.");
+
