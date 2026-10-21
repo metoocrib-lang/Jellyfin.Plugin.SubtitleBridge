@@ -4,7 +4,7 @@ Tu Jellyfin 12.2, Sonarr, Radarr y Bazarr ya están conectados desde el plugin. 
 
 ## 1. Preparar archivos y secretos localmente
 
-En una terminal SSH de la ZimaBoard (sin publicar contraseñas en GitHub ni en ChatGPT):
+En una terminal SSH de la ZimaBoard:
 
 ```sh
 git clone https://github.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge.git
