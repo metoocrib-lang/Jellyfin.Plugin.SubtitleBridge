@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections import deque
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,7 @@ from .disney import DisneyBrowserExtractor
 from .episode_discovery import match_episode
 from .hls import SubtitleError, allowed_disney_series_url
 from .providers import SUPPORTED_SITES
+from .provider_bridge import get_cached, job_from_request, save_cached, validated_request
 
 MAX_JSON = 180_000
 MAX_JOBS = 30
@@ -126,6 +128,31 @@ def enqueue(jobs, bazarr_url, bazarr_key):
             "message": "Trabajos aceptados; todavía no confirma descarga"}
 
 
+def provider_lookup(data):
+    """Check SRT availability or opt-in queue exactly one provider-only job."""
+    request = validated_request(data)
+    job, identifier = job_from_request(request)
+    cached = get_cached(identifier)
+    if cached is not None:
+        return {"state": "ready", "id": identifier,
+                "sha256": hashlib.sha256(cached).hexdigest()}
+    if not request["enqueue"]:
+        return {"state": "absent"}
+    key = "bazarrplus:" + identifier
+    now = time.time()
+    with LOCK:
+        if now - LAST_RUN.get(key, 0) < RETRY_SECONDS:
+            return {"state": "pending"}
+        if QUEUE.full():
+            return {"state": "busy"}
+        LAST_RUN[key] = now
+        # No Bazarr key/url is sent or stored in provider-only jobs.
+        QUEUE.put_nowait((job, None, None))
+    add_event(job, "en_cola_bazarr_plus")
+    remember()
+    return {"state": "queued"}
+
+
 def start_session(provider: str):
     if provider != "disney":
         raise SubtitleError("Conector aún no implementado para esta plataforma")
@@ -188,10 +215,15 @@ def worker():
                         )
                     finally:
                         context.close()
-                BazarrClient(bazarr_url, bazarr_key).upload(
-                    job["series_id"], job["episode_id"], job["language"], srt
-                )
-                add_event(job, "enviado_a_bazarr")
+                if job.get("delivery") == "bazarr_plus":
+                    # Do not upload using synthetic IDs: Bazarr+ owns import.
+                    save_cached(job, srt)
+                    add_event(job, "srt_listo_bazarr_plus")
+                else:
+                    BazarrClient(bazarr_url, bazarr_key).upload(
+                        job["series_id"], job["episode_id"], job["language"], srt
+                    )
+                    add_event(job, "enviado_a_bazarr")
             finally:
                 BROWSER_LOCK.release()
         except SubtitleError as error:
@@ -233,9 +265,19 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.respond(404, {"error": "Ruta no encontrada"})
 
+    def respond_srt(self, data: bytes):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-subrip")
+        self.send_header("Cache-Control", "private, no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_POST(self):
         if not self.authorized(): return
-        if self.path not in ("/v1/login", "/v1/scan"):
+        if self.path not in ("/v1/login", "/v1/scan",
+                             "/v1/provider/lookup", "/v1/provider/download"):
             self.respond(404, {"error": "Ruta no encontrada"})
             return
         try:
@@ -243,12 +285,20 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < length <= MAX_JSON: raise SubtitleError("Solicitud demasiado grande")
             obj = json.loads(self.rfile.read(length))
             if not isinstance(obj, dict): raise SubtitleError("JSON inválido")
-            if self.path == "/v1/login":
-                response = start_session(obj.get("provider"))
+            if self.path == "/v1/provider/lookup":
+                self.respond(200, provider_lookup(obj))
+            elif self.path == "/v1/provider/download":
+                identifier = obj.get("id")
+                content = get_cached(identifier)
+                if content is None:
+                    self.respond(404, {"error": "SRT todavía no disponible"})
+                else:
+                    self.respond_srt(content)
+            elif self.path == "/v1/login":
+                self.respond(202, start_session(obj.get("provider")))
             else:
-                response = enqueue(obj.get("jobs"), obj.get("bazarr_url"),
-                                   obj.get("bazarr_api_key"))
-            self.respond(202, response)
+                self.respond(202, enqueue(obj.get("jobs"), obj.get("bazarr_url"),
+                                          obj.get("bazarr_api_key")))
         except (ValueError, TypeError, SubtitleError):
             self.respond(400, {"error": "Solicitud inválida, credenciales ausentes o navegador ocupado"})
 
