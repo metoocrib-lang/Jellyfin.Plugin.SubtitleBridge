@@ -4,6 +4,8 @@ Plugin nativo para administrar series, idiomas y fuentes de subtítulos desde el
 
 ## Instalación
 
+**¿Usas un NAS distinto de ZimaBoard?** Consulta la [guía de instalación en Synology, QNAP, TrueNAS SCALE, Unraid y NAS Linux con Docker](docs/NAS_INSTALLATION.md). Contiene requisitos, pasos de instalación por terminal, diferencias entre plataformas, red privada y seguridad del agente.
+
 **Repositorio Jellyfin** (Dashboard → Plugins → Repositories → Add):
 ```
 https://raw.githubusercontent.com/metoocrib-lang/Jellyfin.Plugin.SubtitleBridge/main/manifest.json
@@ -31,7 +33,7 @@ El servidor Jellyfin llama a las APIs de los servicios directamente, con `X-Api-
 - **Ver episodios pendientes en Bazarr**: para una serie seguida con fuente Proveedores Bazarr, consulta los capítulos que Bazarr marca como faltantes en el idioma guardado, sin descargarlos.
 - **Buscar subtítulo en Bazarr**: solicita manualmente la búsqueda para **un episodio** mediante PATCH /api/episodes/subtitles. No garantiza resultados ni finalización inmediata.
 
-**Limitación importante:** la búsqueda en Bazarr es por episodio y requiere pulsar Buscar. El seguimiento automático se guarda, pero todavía no existe un planificador. El listado depende de los idiomas faltantes según los perfiles de Bazarr (un episodio sin perfil deseado no aparecerá). Falta implementar el planificador y la vinculación de episodios de Disney+. El agente de navegador es opcional y experimental, y sigue siendo necesario para intentar extraer subtítulos de Disney+ en una sesión autorizada. Ni el plugin ni la configuración directa evaden DRM.
+**Límites importantes:** la búsqueda manual de Bazarr requiere pulsar Buscar para el episodio concreto y depende de los idiomas faltantes según los perfiles de Bazarr. El seguimiento de streaming automático **sí existe mediante eventos de Jellyfin para episodios nuevos**; no hay una revisión periódica diaria. Las equivalencias por serie permiten adaptar la numeración de Sonarr a Disney+; la extracción sigue siendo experimental y requiere el agente Docker con sesión autorizada. Ni el plugin ni el agente evaden DRM.
 
 ## Desarrollo y pruebas
 
@@ -46,11 +48,11 @@ Nunca publiques API keys, contraseñas, cookies ni perfiles de navegador en GitH
 
 ## Extractores desde plataformas de streaming (experimental)
 
-El primer prototipo para Disney+ se mantiene en [`extractor/`](extractor/README.md): navegador local con sesión iniciada por el usuario, captura HLS/WebVTT accesible, SRT e importación opcional en Bazarr. La prueba inicial requiere una URL de episodio; **no** sincroniza todavía temporadas automáticamente desde las series seguidas en Jellyfin. Netflix, Prime, Max y Apple TV+ son conectores pendientes. No se eluden DRM ni controles de acceso.
+El extractor Disney+ está en [`extractor/`](extractor/README.md): navegador local con sesión iniciada por el usuario, captura HLS/WebVTT accesible, conversión a SRT e importación opcional en Bazarr. Actualmente incluye un **agente residente** que recibe episodios desde Jellyfin y un modo de prueba manual por URL de episodio. La identificación del episodio en el catálogo sigue siendo conservadora y puede fallar si Disney+ cambia su web. Netflix, Prime, Max y Apple TV+ son conectores pendientes. No se eluden DRM ni controles de acceso.
 
-## Centro de streaming y activación al detectar un episodio nuevo (experimental v0.6)
+## Centro de streaming y activación al detectar un episodio nuevo (experimental)
 
-El plugin permite elegir **plataforma + idioma + URL de serie + Automático** para cada serie de Sonarr. Jellyfin registra su tarea “Moonfin Subtitle Bridge: revisar streaming” sin una revisión periódica; también se puede iniciar manualmente desde su configuración. El plugin consulta directamente `/api/episodes/wanted` en Bazarr y manda hasta 30 episodios faltantes al agente Docker autenticado.
+El plugin permite elegir **plataforma + idioma + URL de serie + Automático** para cada serie de Sonarr. Reacciona a `ItemAdded` de Jellyfin para episodios nuevos (con identificación TVDB coincidente con Sonarr), **sin revisión periódica**. Desde v0.9.1, los episodios detectados automáticamente se validan por consulta exacta de serie y episodio en Bazarr. El botón **Revisar ahora** sigue siendo una revisión manual global de `/api/episodes/wanted` y puede mandar hasta 30 episodios pendientes al agente Docker autenticado.
 
 **El agente está aislado para que Chromium no se ejecute dentro de Jellyfin.** Se configura desde el plugin con la URL `http://moonfin-streaming-agent:8787` y el mismo token privado `BRIDGE_API_TOKEN` del contenedor. Las claves de Bazarr se transmiten al agente solo en cada trabajo, por la red privada Docker; nunca se escriben en sus archivos de estado. Protege igualmente la red y las copias del directorio de configuración de Jellyfin.
 
@@ -58,7 +60,7 @@ Para las cuentas de streaming, pulsa “Iniciar sesión en Disney+” y autentí
 
 **Límite actual:** Solo Disney+ cuenta con un extractor experimental. El agente intenta identificar el episodio desde enlaces de reproducción claramente marcados S01E02 o equivalentes en la página de la serie; si la web no muestra esos datos, deja constancia del episodio sin identificar. No se garantiza extracción en streaming comercial ni soporte de DRM. Netflix, Prime Video, Max y Apple TV+ aparecen como conectores pendientes sin falsa promesa de descarga.
 
-Guía específica de ZimaBoard 2 y Docker: [extractor/ZIMABOARD.md](extractor/ZIMABOARD.md).
+Guías de instalación: [otros NAS — Synology, QNAP, TrueNAS SCALE, Unraid y Linux Docker](docs/NAS_INSTALLATION.md) y [ZimaBoard 2](extractor/ZIMABOARD.md).
 
 ### Equivalencias entre numeraciones (v0.7, experimental)
 
