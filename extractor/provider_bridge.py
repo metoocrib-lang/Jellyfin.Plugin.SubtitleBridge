@@ -50,8 +50,13 @@ def validated_request(data: dict) -> dict:
     }
 
 
-def cache_id(tvdb_id: int, season: int, episode: int, language: str) -> str:
-    value = f"bazarrplus:v1:{tvdb_id}:{season}:{episode}:{language}"
+def cache_id(tvdb_id: int, season: int, episode: int, language: str,
+             series_url: str, streaming_season: int, streaming_episode: int) -> str:
+    # Bind cached content to both the local identifiers and the exact
+    # Disney+ page/season mapping to prevent stale subtitles being reused
+    # when the administrator changes an episode equivalence.
+    value = (f"bazarrplus:v2:{tvdb_id}:{season}:{episode}:{language}:"
+             f"{streaming_season}:{streaming_episode}:{series_url}")
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
@@ -77,7 +82,8 @@ def save_cached(job: dict, data: bytes) -> None:
     if b"\x00" in data or b"-->" not in data:
         raise SubtitleError("El contenido no parece un SRT")
     identifier = cache_id(job["tvdb_id"], job["tvdb_season"],
-                          job["tvdb_episode"], job["language"])
+                          job["tvdb_episode"], job["language"],
+                          job["series_url"], job["season"], job["episode"])
     directory = cache_dir()
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     temporary = directory / (identifier + ".tmp")
@@ -94,7 +100,9 @@ def save_cached(job: dict, data: bytes) -> None:
 def job_from_request(data: dict) -> tuple[dict, str]:
     request = validated_request(data)
     ident = cache_id(request["tvdb_id"], request["season"],
-                     request["episode"], request["language"])
+                     request["episode"], request["language"],
+                     request["series_url"], request["streaming_season"],
+                     request["streaming_episode"])
     # Synthetic IDs are for agent event display only; these MUST NEVER be
     # sent to Bazarr's /api/episodes/subtitles endpoint.
     job = {
