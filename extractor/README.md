@@ -1,6 +1,6 @@
 # Browser-based subtitle extractor (experimental)
 
-**Goal:** user chooses a series/language in Jellyfin → authenticated provider browser can locate an accessible subtitle track → WebVTT/SRT → Bazarr. This first milestone covers only **one known Disney+ episode URL**; the automatic catalog matching and season scanning do **not** exist yet.
+**Goal:** user chooses a series/language in Jellyfin → authenticated provider browser can locate an accessible subtitle track → WebVTT/SRT → Bazarr. Two workflows coexist: **single-URL compatibility probe** (`compose.yml`) and the **Jellyfin-controlled resident agent** (`compose.agent.yml`). The resident agent can receive a specific episode from Jellyfin, with optional per-series season/episode mappings; episode discovery in Disney+ remains conservative and experimental.
 
 ## What is implemented
 
@@ -26,7 +26,7 @@
 - noVNC is mapped only to `127.0.0.1:6080`; do NOT expose it on the Internet. VNC requires a separate local password, but noVNC itself uses HTTP. For remote access, use an SSH tunnel rather than opening this port publicly.
 - Browsing profiles contain valuable active streaming sessions; protect the Docker volume and system backups. Never send those profiles, cookies, API keys, or signed subtitle URLs to ChatGPT or GitHub.
 - The agent's browser runs in a container separate from Jellyfin. A valid Jellyfin install neither guarantees DRM playback in Playwright Chromium nor authenticates Disney+. This is a technical feasibility test, not proof of production compatibility.
-- Once capture is validated we will add the **authenticated job queue in the Jellyfin plugin**, matching one followed series to the provider catalog automatically and processing later episodes. Those pieces are not implemented in this milestone.
+- The **authenticated queue and new-episode listener** are implemented in the resident agent / Jellyfin plugin; they only process episodes that meet Sonarr/Bazarr eligibility checks. The probe described above remains a separate one-off test and does not use that queue.
 
 ## Unit tests
 
@@ -38,4 +38,4 @@ python -m unittest discover -s extractor/tests -v
 
 Además de la prueba manual de un episodio descrita arriba, el proyecto incluye `compose.agent.yml`: servidor autenticado con cola limitada y navegador privado. Jellyfin programa las revisiones, consulta Bazarr y envía los episodios faltantes. El agente intenta encontrar el enlace de reproducción por número de temporada/capítulo; no usa contraseñas del usuario ni elude DRM. Usa `/v1/status`, `/v1/login` y `/v1/scan` con el encabezado secreto `X-Bridge-Key`.
 
-Consulta las instrucciones específicas en [ZIMABOARD.md](ZIMABOARD.md). Los otros cuatro proveedores aún no tienen extracción real. Las páginas de catálogo pueden cambiar y es posible que se necesite ajustar el selector después de una prueba real.
+Para instalar el agente en NAS consulta la [guía multi-NAS (Synology, QNAP, TrueNAS SCALE, Unraid y Linux Docker)](../docs/NAS_INSTALLATION.md) o las instrucciones de [ZimaBoard](ZIMABOARD.md). Los otros cuatro proveedores aún no tienen extracción real. Las páginas de catálogo pueden cambiar y es posible que se necesite ajustar el selector después de una prueba real.
