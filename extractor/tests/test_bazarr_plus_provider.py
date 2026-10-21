@@ -39,7 +39,7 @@ class ProviderTests(unittest.TestCase):
         contents = MODULE.read_bytes()
         self.assertEqual(manifest["api_version"], "bazarr.provider-hub.v1")
         self.assertEqual(manifest["files"]["provider.py"], hashlib.sha256(contents).hexdigest())
-        canonical = b"provider.py\\0" + str(len(contents)).encode("ascii") + b"\\0" + contents + b"\\0"
+        canonical = b"provider.py\0" + str(len(contents)).encode("ascii") + b"\0" + contents + b"\0"
         self.assertEqual(manifest["bundle_sha256"], hashlib.sha256(canonical).hexdigest())
         self.assertIn("bridge_token", manifest["secret_fields"])
         self.assertFalse(manifest["config_schema"]["properties"]["enable_requests"]["default"])
